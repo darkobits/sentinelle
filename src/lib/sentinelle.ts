@@ -2,7 +2,6 @@ import {spawn} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-import sleep from '@darkobits/sleep';
 import chokidar from 'chokidar';
 import ow from 'ow';
 import pWaitFor from 'p-wait-for';
@@ -48,7 +47,8 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
 
   /**
-   * Path to the file we will run using the configured executable.
+   * Array of any extra arguments to pass to the configured binary, followed by
+   * the path to the configured entrypoint.
    */
   const args = [...(options.extraArgs || []), entry];
 
@@ -60,6 +60,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    */
   const watches = [path.resolve(path.dirname(entry)), ...(options.watch || [])];
   log.silly('watches', watches);
+
 
   /**
    * How long to wait for a process to exit on its own after we issue the
@@ -98,9 +99,55 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
 
   /**
-   * Provided a code, signal, and previous process descriptor "state",
-   * determines what value to set as the new process descriptor's state based on
-   * how the process closed.
+   * Returns a new process descriptor representing a managed process and its
+   * state.
+   */
+  function ProcessDescriptorFactory(): ProcessDescriptor {
+    // Closure-bound source-of-truth for the descriptor's `state` property.
+    let state: ProcessState;
+
+    const pd = {
+      handle: spawn(bin, args, {stdio: spawnStdio}),
+      get state() {
+        return state;
+      },
+      set state(newState: ProcessState) {
+        state = newState;
+        log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
+      }
+    };
+
+    pd.state = 'STARTING';
+
+    // Handle the "message" event.
+    pd.handle.on('message', message => {
+      log.silly('process', message);
+    });
+
+    // Handle the "close" event.
+    pd.handle.on('close', (code, signal) => {
+      const finalProcessState = parseProcessCloseEvent(code, signal, pd.state);
+      pd.state = finalProcessState;
+    });
+
+    // Handle the "error" event.
+    pd.handle.on('error', err => {
+      if (err && err.stack) {
+        log.error('', 'Child process error:', err.message);
+        log.verbose('', err.stack.split('\n').slice(1).join('\n'));
+      }
+    });
+
+    pd.state = 'STARTED';
+
+    return pd;
+  }
+
+
+  /**
+   * Provided a code, signal, and a process descriptor `state`, determines what
+   * the next process descriptor `state` should be based on how the process
+   * closed. Also responsible for messaging this to the user.
    */
   function parseProcessCloseEvent(code: number, signal: string, processDescriptorState: ProcessDescriptor['state']) {
     if (code === 0 && signal === null) {
@@ -123,13 +170,13 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       if (processDescriptorState === 'STOPPING') {
         // Process was issued an interrupt signal and crashed within the grace
         // period.
-        log.error('close', 'Process crashed during shut-down.');
+        log.error('', log.chalk.red('Process crashed while shutting-down.'));
         return 'STOPPED';
       }
 
       if (processDescriptorState === 'STARTED') {
         // Process crashed on its own without requiring an interrupt signal.
-        log.error('close', 'Process crashed.');
+        log.error('', log.chalk.red('Process crashed.'));
         return 'EXITED';
       }
     }
@@ -137,7 +184,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
     if (code === null && signal !== null) {
       // Process was issued an interrupt signal and did not respond within the
       // grace period.
-      log.error('', 'Process failed to shut-down in time and was killed.');
+      log.error('', log.chalk.red('Process failed to shut-down in time and was killed.'));
       return 'KILLED';
     }
 
@@ -163,23 +210,27 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       return [...finalWatches, curWatch];
     }, []);
 
-    log.silly('filteredWatches', filteredWatches);
-
-    watcher = chokidar.watch(filteredWatches);
-
-    watches.forEach(watch => {
+    filteredWatches.forEach(watch => {
       const isDir = fs.statSync(watch).isDirectory();
       log.info('', `Watching ${isDir ? 'directory' : 'file'}: ${log.chalk.green(`${watch}`)}`);
     });
 
+    watcher = chokidar.watch(filteredWatches);
+
+    /**
+     * Called every time we receive a `change` event on a file or directory we
+     * are watching. This function must be implemented in a way that allows it
+     * to be called numerous times, but will only call `startProcess` once, when
+     * the last process has exited.
+     */
     watcher.on('change', async file => {
-      // If there is no process, start a new one.
+      // If there is no managed process running, start one.
       if (!curProcess) {
         log.silly('change', 'No process running; starting process.');
         return startProcess();
       }
 
-      // Bail if the current process is in the process of shutting-down.
+      // If the current process is in the... process... of shutting-down, bail.
       if (curProcess.state === 'STOPPING') {
         log.silly('change', 'Process is still shutting-down; bailing.');
         return;
@@ -194,56 +245,36 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       return startProcess();
     });
 
+    /**
+     * Invoked when the watcher encounters an error.
+     *
+     * TODO: Consider handling this.
+     */
     watcher.on('error', err => {
       if (err && err.stack) {
-        log.error('watcher', err.stack);
+        log.error('', 'Watcher error:', err.message);
+        log.verbose('', err.stack.split('\n').slice(1).join('\n'));
       }
     });
   }
 
 
   /**
-   * Returns a new process descriptor representing a managed process and its
-   * state.
+   * Sets a timeout that resolves after the grace period and then kills the
+   * provided process if it is not already in a closed state.
    */
-  function ProcessDescriptorFactory(): ProcessDescriptor {
-    const pd = {
-      handle: spawn(bin, args, {stdio: spawnStdio}),
-      get state() {
-        return this._state;
-      },
-      set state(newState: ProcessState) {
-        this._state = newState;
-        log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
+  function killAfterGracePeriod(pd: ProcessDescriptor): void {
+    setTimeout(() => {
+      if (!['STOPPED', 'EXITED', 'KILLED'].includes(pd.state)) {
+        pd.handle.kill();
       }
-    };
-
-    pd.state = 'STARTING';
-
-    pd.handle.on('message', message => {
-      log.silly('process', message);
-    });
-
-    // Handle the "close" event.
-    pd.handle.on('close', (code, signal) => {
-      const finalProcessState = parseProcessCloseEvent(code, signal, pd.state);
-      pd.state = finalProcessState;
-    });
-
-    // Handle the "error" event.
-    pd.handle.on('error', err => {
-      log.error('', 'Child process error:', err);
-    });
-
-    pd.state = 'STARTED';
-
-    return pd;
+    }, processShutdownGracePeriod || 0);
   }
 
 
   /**
-   * Waits for the process state to become 'STOPPED', then starts a new managed
-   * process. If/when the process exits, process state state will be updated.
+   * Waits for any current managed process to become 'STOPPED', then starts a
+   * new managed process and returns its process descriptor.
    */
   async function startProcess() {
     // Start watchers. If this has already been done, this will be a no-op.
@@ -268,8 +299,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
 
   /**
-   * Sends a signal to the managed process and waits for the instance's state
-   * variable to update to 'STOPPED'.
+   * Sends a signal to the managed process and waits for it to become 'STOPPED'.
    */
   async function stopProcess(signal: NodeJS.Signals = 'SIGINT'): Promise<void> {
     // Bail if there is no process to stop.
@@ -278,22 +308,19 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       return;
     }
 
-    // Bail if the process is in such a state that we don't need to stop it.
+    // If the process is in such a state that we don't need to stop it, bail.
     if (['STOPPED', 'EXITED', 'KILLED'].includes(curProcess.state)) {
       log.warn('', 'Process is already stopped; nothing to do.');
       return;
     }
 
-    // Is this still needed?
+    // If the process is already stopping, bail.
     if (curProcess.state === 'STOPPING') {
-      // Note: We sometimes get this unexpectedly.
-      log.warn('', 'Process did not gracefully shut-down after last restart attempt. Last process state was:', curProcess.state);
-      // lastProcess.handle.kill();
-      await pWaitFor(() => ['STOPPED', 'EXITED', 'KILLED'].includes(curProcess.state));
+      log.warn('', 'Process is already stopping; nothing to do.');
       return;
     }
 
-    log.info('', 'Restarting process.');
+    log.info('', 'Stopping process...');
     log.silly('', `Sending signal ${log.chalk.yellow.bold(signal)} to process.`);
 
     curProcess.state = 'STOPPING';
@@ -306,23 +333,11 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   }
 
 
-  function killAfterGracePeriod(pd: ProcessDescriptor): void {
-    // Asynchronously wait for the grace period duration, then kill the process.
-    sleep(processShutdownGracePeriod || 0).then(() => { // tslint:disable-line no-floating-promises
-      if (!['STOPPED', 'EXITED', 'KILLED'].includes(pd.state)) {
-        pd.handle.kill();
-        log.warn('', 'Process did not exit within the grace period and was forcefully terminated.');
-        log.verbose('', `Its state was "${pd.state}".`);
-      }
-    });
-  }
-
-
   /**
    * Closes all file watchers and waits for the current process to close. An
    * optional signal may be provided which will be sent to the process.
    */
-  async function shutdown(signal: NodeJS.Signals = 'SIGINT') {
+  async function stop(signal: NodeJS.Signals = 'SIGINT') {
     log.verbose('', 'Shutting down.');
 
     // Close watchers.
@@ -338,8 +353,5 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   }
 
 
-  return {
-    start: startProcess,
-    stop: shutdown
-  };
+  return {start: startProcess, stop};
 }

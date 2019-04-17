@@ -2,6 +2,7 @@
 
 const {execSync} = require('child_process');
 const env = require('@darkobits/env').default;
+const IS_CI = require('is-ci');
 
 
 /**
@@ -35,28 +36,36 @@ function tagAtHead() {
 function buildAndPushImage() {
   const gitTag = tagAtHead();
 
-  if (!gitTag) {
+  if (IS_CI && !gitTag) {
     console.log('[build-image] No tags at HEAD; skipping.');
     return;
   }
 
   // Log-in to Docker Hub.
-  run(`echo ${env('DOCKER_PASSWORD', true)} | docker login --username ${env('DOCKER_USERNAME', true)} --password-stdin`);
+  if (IS_CI) {
+    run(`echo ${env('DOCKER_PASSWORD', true)} | docker login --username ${env('DOCKER_USERNAME', true)} --password-stdin`);
+  }
 
   // Compute base image and versioned image names.
   const baseImageName = 'darkobits/sentinelle';
-  const gitTagImageName = `${baseImageName}:${gitTag}`;
-  const tags = [baseImageName, gitTagImageName];
+  const tags = [baseImageName];
+
+  if (IS_CI) {
+    tags.push(`${baseImageName}:${gitTag}`);
+  }
 
   // Build base image.
   run(`docker build . --tag=${baseImageName}`);
 
   // Tag and push images.
-  tagsToPush.forEach(tag => {
+  tags.forEach(tag => {
     run(`docker tag ${baseImageName} ${tag}`);
     console.log(`[build-image] Successfully tagged ${tag}`);
-    run(`docker push ${tag}`);
-    console.log(`[build-image] Successfully pushed ${tag}`);
+
+    if (IS_CI) {
+      run(`docker push ${tag}`);
+      console.log(`[build-image] Successfully pushed ${tag}`);
+    }
   });
 }
 

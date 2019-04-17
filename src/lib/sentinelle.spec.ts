@@ -1,5 +1,4 @@
 import fs from 'fs';
-import sleep from '@darkobits/sleep';
 import Emittery from 'emittery';
 import uuid from 'uuid/v4';
 
@@ -7,6 +6,7 @@ import uuid from 'uuid/v4';
 describe('Sentinelle', () => {
   let sent: any;
   let statSyncSpy: jest.Mock<fs.Stats, [fs.PathLike]>;
+
 
   // ----- Test Data -----------------------------------------------------------
 
@@ -17,12 +17,10 @@ describe('Sentinelle', () => {
   const STDIO = uuid();
   const EXTRA_ARGS = [uuid(), uuid(), uuid()];
   const PROCESS_SHUTDOWN_SIGNAL = uuid();
-  const PROCESS_SHUTDOWN_GRACE_PERIOD = 99919194325;
+  const PROCESS_SHUTDOWN_GRACE_PERIOD = 999325;
 
 
   // ----- Spies ---------------------------------------------------------------
-
-  const sleepSpy = jest.fn(() => Promise.resolve());
 
   const chokidarWatchEmitter = new Emittery();
 
@@ -41,7 +39,6 @@ describe('Sentinelle', () => {
     // This sets the process state to "KILLED", but its the only path we can
     // take without throwing an error, because Emittery only allows us to pass a
     // single argument to emit();
-    await sleep(1000);
     return childProcessEmitter.emit('close', null); // tslint:disable-line no-null-keyword
   });
 
@@ -50,12 +47,12 @@ describe('Sentinelle', () => {
     return childProcessEmitter;
   });
 
+  const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
 
   // ----- Mocks ---------------------------------------------------------------
 
   beforeAll(async () => {
-    jest.doMock('@darkobits/sleep', () => sleepSpy);
-
     jest.doMock('chokidar', () => ({
       watch: chokidarWatchSpy
     }));
@@ -97,54 +94,50 @@ describe('Sentinelle', () => {
       processShutdownSignal: PROCESS_SHUTDOWN_SIGNAL,
       stdio: STDIO
     });
-
-    return sent.start();
   });
 
-  it('should create watchers using the configured "entry" and "watch" options', () => {
-    // Asserts correct behavior of "entry" and "watch" options.
-    expect(chokidarWatchSpy.mock.calls[0][0]).toMatchObject([
-      ENTRY_PATH,
-      ...EXTRA_WATCHES
-    ]);
-  });
+  describe('#start', () => {
+    beforeAll(async () => {
+      await sent.start();
+    });
 
-  it('spawn a child process using the configured "bin", "entry", "extraArgs", and "stdio" options', () => {
-    expect(childProcessSpawnSpy.mock.calls[0]).toMatchObject([
-      BIN,
-      [...EXTRA_ARGS, ENTRY],
-      {stdio: STDIO}
-    ]);
-  });
+    it('should create watchers using the configured "entry" and "watch" options', () => {
+      // Asserts correct behavior of "entry" and "watch" options.
+      expect(chokidarWatchSpy.mock.calls[0][0]).toMatchObject([
+        ENTRY_PATH,
+        ...EXTRA_WATCHES
+      ]);
+    });
 
-  it('should send a kill signal to the child process using the configured signal', async () => {
-    await chokidarWatchEmitter.emit('change');
+    it('spawn a child process using the configured "bin", "entry", "extraArgs", and "stdio" options', () => {
+      expect(childProcessSpawnSpy.mock.calls[0]).toMatchObject([
+        BIN,
+        [...EXTRA_ARGS, ENTRY],
+        {stdio: STDIO}
+      ]);
+    });
 
-    // Assert that we called kill() with SIGUSR2.
-    // @ts-ignore
-    expect(childProcessEmitter.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
-  });
+    it('should send a kill signal to the child process using the configured signal', async () => {
+      await chokidarWatchEmitter.emit('change');
 
-  it('start a force-kill timeout using the configured grace period', () => {
-    // Assert that we started a timeout using the configured grace period.
-    // @ts-ignore
-    expect(sleepSpy.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_GRACE_PERIOD);
-  });
+      // Assert that we called kill() with SIGUSR2.
+      // @ts-ignore
+      expect(childProcessEmitter.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
+    });
 
-  it('should start a new child process using the configured parameters', () => {
-    // Assert that we re-started our process.
-    expect(childProcessSpawnSpy.mock.calls[1]).toMatchObject([
-      BIN,
-      [...EXTRA_ARGS, ENTRY],
-      {stdio: STDIO}
-    ]);
-  });
+    it('start a force-kill timeout using the configured grace period', () => {
+      // Assert that we started a timeout using the configured grace period.
+      // @ts-ignore
+      expect(setTimeoutSpy.mock.calls[0][1]).toBe(PROCESS_SHUTDOWN_GRACE_PERIOD);
+    });
 
-  // TODO: Actually test for something here.
-  describe('on watcher errors', () => {
-    it('should log an error event?', async () => {
-      const err = new Error(uuid());
-      await chokidarWatchEmitter.emit('error', err);
+    it('should start a new child process using the configured parameters', () => {
+      // Assert that we re-started our process.
+      expect(childProcessSpawnSpy.mock.calls[1]).toMatchObject([
+        BIN,
+        [...EXTRA_ARGS, ENTRY],
+        {stdio: STDIO}
+      ]);
     });
   });
 
@@ -166,9 +159,18 @@ describe('Sentinelle', () => {
     });
   });
 
+  // TODO: Actually test for something here.
+  describe('on watcher errors', () => {
+    it('should log an error event?', async () => {
+      const err = new Error(uuid());
+      await chokidarWatchEmitter.emit('error', err);
+    });
+  });
+
   afterAll(() => {
     jest.unmock('chokidar');
     jest.unmock('child_process');
     statSyncSpy.mockRestore();
+    setTimeoutSpy.mockRestore();
   });
 });
