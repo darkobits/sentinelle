@@ -192,7 +192,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     if (pd.killReason === 'GRACE_PERIOD_EXPIRED') {
       // Process took longer than the grace period to shut-down.
-      log.error('', log.chalk.red.bold('Process failed to shut-down in time and was killed.', signal));
+      log.error('', log.chalk.red.bold('Process failed to shut-down in time and was killed.'));
       return 'KILLED';
     }
 
@@ -240,8 +240,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       }
     }
 
-
-    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}`);
+    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}; State: ${pd.state}`);
   }
 
 
