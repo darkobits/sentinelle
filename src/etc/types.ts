@@ -69,7 +69,7 @@ export interface SentinelleOptions {
   /**
    * (Optional) Signal to use when shutting-down processes.
    *
-   * Default: SIGUSR2
+   * Default: SIGINT
    */
   processShutdownSignal?: NodeJS.Signals;
 
@@ -107,6 +107,21 @@ export type ProcessState =
  * Object containing a child process handle and a process state.
  */
 export interface ProcessDescriptor {
+  /**
+   * Child process instance representing the managed process.
+   */
   handle: ChildProcess;
+
+  /**
+   * Additional state variable we use to track what we think the process should
+   * be doing at any point in time.
+   */
   state: ProcessState;
+
+  /**
+   * Set to true if Sentinelle detects that the process exited but theat Node is
+   * keeping it alive while it waits for a debugger to disconnect. This is
+   * probably a bug in Node, but regardless, results in a poor user experience.
+   */
+  killReason?: 'GRACE_PERIOD_EXPIRED' | 'HANGING_DEBUGGER';
 }

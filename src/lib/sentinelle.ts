@@ -14,6 +14,9 @@ import {ProcessDescriptor, ProcessState, SentinelleOptions} from 'etc/types';
 /**
  * Creates a new Sentinelle that will watch a set of files and (re)start a
  * process when they change.
+ *
+ * TODO: Add our own SIGINT handler to gracefully shut-down the process before
+ * exiting.
  */
 export default function SentinelleFactory(options: SentinelleOptions) {
   // Validate options.
@@ -82,7 +85,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   /**
    * Output options for spawned processes.
    */
-  const spawnStdio = options.stdio || 'inherit';
+  const spawnStdio = options.stdio || 'pipe';
   log.silly('stdio', spawnStdio);
 
 
@@ -106,7 +109,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
     // Closure-bound source-of-truth for the descriptor's `state` property.
     let state: ProcessState;
 
-    const pd = {
+    const pd: ProcessDescriptor = {
       handle: spawn(bin, args, {stdio: spawnStdio}),
       get state() {
         return state;
@@ -126,7 +129,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     // Handle the "close" event.
     pd.handle.on('close', (code, signal) => {
-      const finalProcessState = parseProcessCloseEvent(code, signal, pd.state);
+      const finalProcessState = parseProcessCloseEvent(code, signal, pd);
       pd.state = finalProcessState;
     });
 
@@ -138,6 +141,38 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       }
     });
 
+    // If the default `pipe` option was used, pipe the child process' output to
+    // the parent process' output.
+    if (pd.handle.stdout) {
+      pd.handle.stdout.pipe(process.stdout);
+    }
+
+    if (pd.handle.stderr) {
+      pd.handle.stderr.pipe(process.stderr);
+
+      /**
+       * F.A.Q.
+       *
+       * Q: What all this, then?
+       *
+       * A: So, when our child process is run with the --inspect (or similar)
+       *    flags, the process does not organically close when the main thread
+       *    dies because Node keeps the debugger alive. This issue should have
+       *    been fixed by [1], but still persists even in Node 10.
+       *
+       * [1]: https://github.com/nodejs/node/issues/7742
+       */
+      pd.handle.stderr.on('data', chunk => {
+        if (/Waiting for the debugger to disconnect/ig.test(Buffer.from(chunk).toString('utf8'))) {
+          log.silly('', 'Detected a hanging debugger instance.');
+          pd.killReason = 'HANGING_DEBUGGER';
+          pd.handle.kill('SIGTERM');
+        }
+      });
+    } else {
+      log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging debugger instances.');
+    }
+
     pd.state = 'STARTED';
 
     return pd;
@@ -148,45 +183,64 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Provided a code, signal, and a process descriptor `state`, determines what
    * the next process descriptor `state` should be based on how the process
    * closed. Also responsible for messaging this to the user.
+   *
+   * - A `null` signal means the child process exited normally.
+   * - A `0` or `null` code means the process exited normally.
    */
-  function parseProcessCloseEvent(code: number, signal: string, processDescriptorState: ProcessDescriptor['state']) {
-    if (code === 0 && signal === null) {
-      if (processDescriptorState === 'STOPPING') {
-        // Process was issued an interrupt signal and closed cleanly within the
-        // grace period.
-        log.info('', 'Process shut-down gracefully.');
-        return 'STOPPED';
-      }
+  function parseProcessCloseEvent(code: number, signal: string, pd: ProcessDescriptor) {
 
-      if (processDescriptorState === 'STARTED') {
-        // Process exited cleanly on its own without requiring an interrupt
-        // signal.
-        log.info('', 'Process exited cleanly.');
-        return 'EXITED';
-      }
-    }
+    // ----- Exotic Unstable Exits ---------------------------------------------
 
-    if (code !== 0 && signal === null) {
-      if (processDescriptorState === 'STOPPING') {
-        // Process was issued an interrupt signal and crashed within the grace
-        // period.
-        log.error('', log.chalk.red('Process crashed while shutting-down.'));
-        return 'STOPPED';
-      }
-
-      if (processDescriptorState === 'STARTED') {
-        // Process crashed on its own without requiring an interrupt signal.
-        log.error('', log.chalk.red('Process crashed.'));
-        return 'EXITED';
-      }
-    }
-
-    if (code === null && signal !== null) {
-      // Process was issued an interrupt signal and did not respond within the
-      // grace period.
-      log.error('', log.chalk.red('Process failed to shut-down in time and was killed.'));
+    if (pd.killReason === 'GRACE_PERIOD_EXPIRED') {
+      // Process took longer than the grace period to shut-down.
+      log.error('', log.chalk.red.bold('Process failed to shut-down in time and was killed.', signal));
       return 'KILLED';
     }
+
+    if (pd.killReason === 'HANGING_DEBUGGER') {
+      // Process had a hanging debugger instnace attached and failed to
+      // shut-down.
+      log.error('', log.chalk.red.bold('Detected hanging debugger; process was killed.'));
+      return 'KILLED';
+    }
+
+
+    // ----- Unstable Exits ----------------------------------------------------
+
+    if (code !== 0 && signal === null) {
+      if (pd.state === 'STOPPING') {
+        // Process was issued an interrupt signal and crashed within the grace
+        // period.
+        log.error('', log.chalk.red.bold('Process crashed while shutting-down.'));
+        return 'STOPPED';
+      }
+
+      if (pd.state === 'STARTED') {
+        // Process crashed on its own without requiring an interrupt signal.
+        log.error('', log.chalk.red.bold('Process crashed.'));
+        return 'EXITED';
+      }
+    }
+
+
+    // ----- Clean Exits -------------------------------------------------------
+
+    if (code === 0 || code === null) {
+      if (pd.state === 'STOPPING') {
+        // Process was issued an interrupt signal and closed cleanly within the
+        // grace period.
+        log.info('', log.chalk.bold('Process shut-down gracefully.'));
+        return 'STOPPED';
+      }
+
+      if (pd.state === 'STARTED') {
+        // Process exited cleanly on its own without requiring an interrupt
+        // signal.
+        log.info('', log.chalk.bold('Process exited cleanly.'));
+        return 'EXITED';
+      }
+    }
+
 
     throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}`);
   }
@@ -212,7 +266,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     filteredWatches.forEach(watch => {
       const isDir = fs.statSync(watch).isDirectory();
-      log.info('', `Watching ${isDir ? 'directory' : 'file'}: ${log.chalk.green(`${watch}`)}`);
+      log.info('', log.chalk.bold(`Watching ${isDir ? 'directory' : 'file'}:`), log.chalk.green(`${watch}`));
     });
 
     watcher = chokidar.watch(filteredWatches);
@@ -266,7 +320,9 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   function killAfterGracePeriod(pd: ProcessDescriptor): void {
     setTimeout(() => {
       if (!['STOPPED', 'EXITED', 'KILLED'].includes(pd.state)) {
-        pd.handle.kill();
+        log.warn('', 'Grace period expired, sending SIGTERM to process.');
+        pd.killReason = 'GRACE_PERIOD_EXPIRED';
+        pd.handle.kill('SIGTERM');
       }
     }, processShutdownGracePeriod || 0);
   }
@@ -288,7 +344,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     try {
       const commandAsString = `${bin.split(path.sep).slice(-1)} ${args.join(' ')}`;
-      log.info('', `Starting: ${log.chalk.green(commandAsString)}`);
+      log.info('', log.chalk.bold('Starting:'), log.chalk.green(commandAsString));
       const pd = ProcessDescriptorFactory();
       curProcess = pd;
       return pd.handle;
@@ -320,7 +376,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       return;
     }
 
-    log.info('', 'Stopping process...');
+    log.info('', log.chalk.bold('Stopping process...'));
     log.silly('', `Sending signal ${log.chalk.yellow.bold(signal)} to process.`);
 
     curProcess.state = 'STOPPING';
