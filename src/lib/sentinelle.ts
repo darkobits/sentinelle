@@ -188,7 +188,6 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * - A `0` or `null` code means the process exited normally.
    */
   function parseProcessCloseEvent(code: number, signal: string, pd: ProcessDescriptor) {
-
     // ----- Exotic Unstable Exits ---------------------------------------------
 
     if (pd.killReason === 'GRACE_PERIOD_EXPIRED') {
