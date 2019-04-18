@@ -26,6 +26,12 @@ yargs.option('watch', {
   required: false
 });
 
+yargs.option('kill', {
+  description: 'POSIX signal to send to the process when we need it to shut-down.',
+  type: 'string',
+  required: false
+});
+
 yargs.showHelpOnFail(true, 'See --help for usage instructions.');
 yargs.wrap(yargs.terminalWidth());
 yargs.version();
@@ -40,9 +46,9 @@ yargs.help();
 async function main() {
   try {
     // Parse command-line arguments, bail on --help, --version, etc.
-    const {_, bin, watch} = yargs.argv as Arguments;
+    const {_, bin, watch, kill} = yargs.argv as Arguments;
     const [entry, ...extraArgs] = _;
-    return SentinelleFactory({bin, entry, extraArgs, watch}).start();
+    return SentinelleFactory({bin, entry, extraArgs, watch, processShutdownSignal: kill}).start();
   } catch (err) {
     log.error('', err.message);
     log.verbose('', err.stack.split('\n').slice(1).join('\n'));

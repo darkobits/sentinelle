@@ -75,7 +75,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Signal we will send to child processes to indicate we want them to shut
    * down.
    */
-  const processShutdownSignal = options.processShutdownSignal || 'SIGUSR2';
+  const processShutdownSignal = options.processShutdownSignal || 'SIGINT';
   log.silly('signal', processShutdownSignal);
 
 

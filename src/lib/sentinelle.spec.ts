@@ -120,7 +120,7 @@ describe('Sentinelle', () => {
     it('should send a kill signal to the child process using the configured signal', async () => {
       await chokidarWatchEmitter.emit('change');
 
-      // Assert that we called kill() with SIGUSR2.
+      // Assert that we called kill() with SIGINT.
       // @ts-ignore
       expect(childProcessEmitter.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
     });

@@ -22,6 +22,13 @@ export interface Arguments extends Yarguments {
    * Default: Directory of entry file.
    */
   watch?: Array<string>;
+
+  /**
+   * POSIX signal to send to the process when we need it to shut-down.
+   *
+   * Default: SIGINT
+   */
+  kill?: NodeJS.Signals;
 }
 
 
