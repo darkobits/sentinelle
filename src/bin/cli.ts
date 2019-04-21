@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import adeiu from '@darkobits/adeiu';
 import yargs from 'yargs';
 import SentinelleFactory from 'lib/sentinelle';
 import {Arguments} from 'etc/types';
@@ -48,7 +49,14 @@ async function main() {
     // Parse command-line arguments, bail on --help, --version, etc.
     const {_, bin, watch, kill} = yargs.argv as Arguments;
     const [entry, ...extraArgs] = _;
-    return SentinelleFactory({bin, entry, extraArgs, watch, processShutdownSignal: kill}).start();
+    const sent = SentinelleFactory({bin, entry, extraArgs, watch, processShutdownSignal: kill});
+
+    adeiu(async signal => {
+      log.info('', log.chalk.bold(`Got signal ${signal}.`));
+      await sent.stop();
+    });
+
+    await sent.start();
   } catch (err) {
     log.error('', err.message);
     log.verbose('', err.stack.split('\n').slice(1).join('\n'));

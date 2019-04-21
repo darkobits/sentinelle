@@ -1,12 +1,11 @@
 import fs from 'fs';
+import childProcess from 'child_process';
 import Emittery from 'emittery';
 import uuid from 'uuid/v4';
 
 
 describe('Sentinelle', () => {
   let sent: any;
-  let statSyncSpy: jest.Mock<fs.Stats, [fs.PathLike]>;
-
 
   // ----- Test Data -----------------------------------------------------------
 
@@ -16,50 +15,54 @@ describe('Sentinelle', () => {
   const BIN = uuid();
   const STDIO = uuid();
   const EXTRA_ARGS = [uuid(), uuid(), uuid()];
-  const PROCESS_SHUTDOWN_SIGNAL = uuid();
+  const PROCESS_SHUTDOWN_SIGNAL = 'PROCESS_SHUTDOWN_SIGNAL';
   const PROCESS_SHUTDOWN_GRACE_PERIOD = 999325;
 
-
-  // ----- Spies ---------------------------------------------------------------
-
-  const chokidarWatchEmitter = new Emittery();
-
-  // @ts-ignore
-  chokidarWatchEmitter.close = jest.fn();
-
-  const chokidarWatchSpy = jest.fn((...args) => {
-    // console.warn('[chokidar] Got args:', args);
-    return chokidarWatchEmitter;
-  });
-
-  const childProcessEmitter = new Emittery();
-
-  // @ts-ignore
-  childProcessEmitter.kill = jest.fn(async () => {
-    // This sets the process state to "KILLED", but its the only path we can
-    // take without throwing an error, because Emittery only allows us to pass a
-    // single argument to emit();
-    return childProcessEmitter.emit('close', null); // tslint:disable-line no-null-keyword
-  });
-
-  const childProcessSpawnSpy = jest.fn((...args) => {
-    // console.warn('[spawn] Got args:', args);
-    return childProcessEmitter;
-  });
-
-  const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+  let chokidarWatchEmitter: Emittery;
+  let childProcessEmitter: Emittery;
+  let chokidarWatchSpy: jest.Mock<Emittery, Array<any>>;
+  let spawnSpy: jest.Mock<childProcess.ChildProcess, [string, Array<string>, childProcess.SpawnOptions]>;
+  let setTimeoutSpy: jest.SpyInstance<NodeJS.Timeout, [(...args: Array<any>) => void, number, ...Array<any>]>;
+  let statSyncSpy: jest.Mock<fs.Stats, [fs.PathLike]>;
 
 
   // ----- Mocks ---------------------------------------------------------------
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    chokidarWatchEmitter = new Emittery();
+
+    // @ts-ignore
+    chokidarWatchEmitter.close = jest.fn((...args) => {
+      // console.warn('[watcher.close] Called with:', args);
+    });
+
+    chokidarWatchSpy = jest.fn((...args) => {
+      // console.warn('[chokidar] Got args:', args);
+      return chokidarWatchEmitter;
+    });
+
     jest.doMock('chokidar', () => ({
       watch: chokidarWatchSpy
     }));
 
-    jest.doMock('child_process', () => ({
-      spawn: childProcessSpawnSpy
-    }));
+    childProcessEmitter = new Emittery();
+
+    // @ts-ignore
+    childProcessEmitter.kill = jest.fn(async () => {
+      // console.warn('[kill] Called.');
+      // This sets the process state to "KILLED", but its the only path we can
+      // take without throwing an error, because Emittery only allows us to pass a
+      // single argument to emit();
+      return childProcessEmitter.emit('close', null); // tslint:disable-line no-null-keyword
+    });
+
+    // @ts-ignore
+    spawnSpy = jest.spyOn(childProcess, 'spawn').mockImplementation((...args) => {
+      // console.warn('[spawn] Got args:', args);
+      return childProcessEmitter;
+    });
+
+    setTimeoutSpy = jest.spyOn(global, 'setTimeout');
 
     jest.doMock('lib/utils', () => ({
       ensureBin: jest.fn((bin: string) => bin),
@@ -69,6 +72,7 @@ describe('Sentinelle', () => {
     }));
 
     const oStatSync = fs.statSync;
+
     statSyncSpy = jest.spyOn(fs, 'statSync').mockImplementation((arg: string) => {
       const isOurCall = [ENTRY_PATH, ENTRY, ...EXTRA_WATCHES].map(item => arg.includes(item)).includes(true);
 
@@ -97,7 +101,7 @@ describe('Sentinelle', () => {
   });
 
   describe('#start', () => {
-    beforeAll(async () => {
+    beforeEach(async () => {
       await sent.start();
     });
 
@@ -109,8 +113,8 @@ describe('Sentinelle', () => {
       ]);
     });
 
-    it('spawn a child process using the configured "bin", "entry", "extraArgs", and "stdio" options', () => {
-      expect(childProcessSpawnSpy.mock.calls[0]).toMatchObject([
+    it('should spawn a child process using the configured "bin", "entry", "extraArgs", and "stdio" options', () => {
+      expect(spawnSpy.mock.calls[0]).toMatchObject([
         BIN,
         [...EXTRA_ARGS, ENTRY],
         {stdio: STDIO}
@@ -125,15 +129,19 @@ describe('Sentinelle', () => {
       expect(childProcessEmitter.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
     });
 
-    it('start a force-kill timeout using the configured grace period', () => {
+    it('start a force-kill timeout using the configured grace period', async () => {
+      await chokidarWatchEmitter.emit('change');
+
       // Assert that we started a timeout using the configured grace period.
       // @ts-ignore
       expect(setTimeoutSpy.mock.calls[0][1]).toBe(PROCESS_SHUTDOWN_GRACE_PERIOD);
     });
 
-    it('should start a new child process using the configured parameters', () => {
+    it('should start a new child process using the configured parameters', async () => {
+      await chokidarWatchEmitter.emit('change');
+
       // Assert that we re-started our process.
-      expect(childProcessSpawnSpy.mock.calls[1]).toMatchObject([
+      expect(spawnSpy.mock.calls[1]).toMatchObject([
         BIN,
         [...EXTRA_ARGS, ENTRY],
         {stdio: STDIO}
@@ -142,9 +150,10 @@ describe('Sentinelle', () => {
   });
 
   describe('#stop', () => {
-    const CUSTOM_SIGNAL = uuid();
+    const CUSTOM_SIGNAL = 'CUSTOM_SIGNAL';
 
-    beforeAll(async () => {
+    beforeEach(async () => {
+      await sent.start();
       await sent.stop(CUSTOM_SIGNAL);
     });
 
@@ -160,16 +169,18 @@ describe('Sentinelle', () => {
   });
 
   // TODO: Actually test for something here.
-  describe('on watcher errors', () => {
-    it('should log an error event?', async () => {
-      const err = new Error(uuid());
-      await chokidarWatchEmitter.emit('error', err);
-    });
-  });
+  // describe('on watcher errors', () => {
+  //   it('should log an error event?', async () => {
+  //     const err = new Error(uuid());
+  //     await chokidarWatchEmitter.emit('error', err);
+  //   });
+  // });
 
-  afterAll(() => {
+  afterEach(() => {
     jest.unmock('chokidar');
-    jest.unmock('child_process');
+    jest.unmock('lib/utils');
+    jest.resetModuleRegistry();
+    spawnSpy.mockRestore();
     statSyncSpy.mockRestore();
     setTimeoutSpy.mockRestore();
   });

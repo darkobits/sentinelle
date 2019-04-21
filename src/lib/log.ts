@@ -4,6 +4,7 @@ import {randomArrayElement} from 'lib/utils';
 
 
 const log = LogFactory('', env('NODE_ENV') === 'test' ? 'silent' : env('LOG_LEVEL') || 'info');
+// const log = LogFactory('', 'silly');
 
 const headings = [
   '\u001b[38;5;38ms\u001b[39m\u001b[38;5;38me\u001b[39m\u001b[38;5;44mn\u001b[39m\u001b[38;5;44mt\u001b[39m\u001b[38;5;43mi\u001b[39m\u001b[38;5;43mn\u001b[39m\u001b[38;5;49me\u001b[39m\u001b[38;5;48ml\u001b[39m\u001b[38;5;84ml\u001b[39m\u001b[38;5;84me\u001b[39m',
