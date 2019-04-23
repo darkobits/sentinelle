@@ -177,11 +177,16 @@ describe('Sentinelle', () => {
   // });
 
   afterEach(() => {
+    chokidarWatchEmitter.clearListeners();
+    childProcessEmitter.clearListeners();
+
     jest.unmock('chokidar');
     jest.unmock('lib/utils');
-    jest.resetModuleRegistry();
+
     spawnSpy.mockRestore();
     statSyncSpy.mockRestore();
     setTimeoutSpy.mockRestore();
+
+    jest.resetModuleRegistry();
   });
 });

@@ -5,11 +5,11 @@ services:
   - docker
 
 install:
-  - npm ci
+  - npm ci --ignore-scripts
 
 script:
   - npx nps build
-  - npx nps test.coverage
+  - npx nps test.coverage -- -- --detectOpenHandles --forceExit
   - ./etc/build-image.js
 
 after_success:
