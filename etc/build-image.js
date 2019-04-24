@@ -25,7 +25,7 @@ function tagAtHead() {
     return false;
   }
 
-  return results[1];
+  return results[0];
 }
 
 
