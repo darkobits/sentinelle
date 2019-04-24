@@ -55,7 +55,11 @@ export function ensureBin(name: string) {
   try {
     return execSync(`${binFinder} ${name}`, {encoding: 'utf8'}).trim();
   } catch (err) {
-    throw new Error(`The binary "${name}" was not found on your system.`);
+    if (err && err.message && err.message.toLowerCase().includes('command failed')) {
+      throw new Error(`The binary "${name}" was not found on your system.`);
+    }
+
+    throw err;
   }
 }
 

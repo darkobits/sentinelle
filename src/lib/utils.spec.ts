@@ -1,3 +1,8 @@
+import fs from 'fs';
+import os from 'os';
+import childProcess from 'child_process';
+import uuid from 'uuid/v4';
+
 import {
   isNumerical,
   parseTime
@@ -41,6 +46,161 @@ describe('parseTime', () => {
   describe('when provided an invalid string', () => {
     it('should return `undefined`', () => {
       expect(parseTime('foo')).toBe(undefined);
+      expect(parseTime(undefined)).toBe(undefined);
     });
+  });
+});
+
+
+describe('ensureBin', () => {
+  let osPlatformSpy: jest.SpyInstance<NodeJS.Platform, []>;
+  let execSyncSpy: jest.SpyInstance<Buffer, [string, (childProcess.ExecSyncOptions | undefined)?]>;
+  let ensureBin: Function;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    osPlatformSpy = jest.spyOn(os, 'platform');
+    execSyncSpy = jest.spyOn(childProcess, 'execSync');
+    ensureBin = require('./utils').ensureBin; // tslint:disable-line no-require-imports
+  });
+
+  describe('on Windows platforms', () => {
+    beforeEach(() => {
+      osPlatformSpy.mockReturnValue('win32');
+      // @ts-ignore
+      execSyncSpy.mockReturnValue('');
+    });
+
+    it('should look for binaries using "where"', () => {
+      const BIN_NAME = uuid();
+      ensureBin(BIN_NAME);
+      expect(osPlatformSpy).toHaveBeenCalled();
+      expect(execSyncSpy.mock.calls[0][0].includes('where')).toBe(true);
+      expect(execSyncSpy.mock.calls[0][0].includes(BIN_NAME)).toBe(true);
+    });
+  });
+
+  describe('on non-Windows platforms', () => {
+    beforeEach(() => {
+      osPlatformSpy.mockReturnValue('darwin');
+      // @ts-ignore
+      execSyncSpy.mockReturnValue('');
+    });
+
+    it('should look for binaries using "which"', () => {
+      const BIN_NAME = uuid();
+      ensureBin(BIN_NAME);
+      expect(osPlatformSpy).toHaveBeenCalled();
+      expect(execSyncSpy.mock.calls[0][0].includes('which')).toBe(true);
+      expect(execSyncSpy.mock.calls[0][0].includes(BIN_NAME)).toBe(true);
+    });
+  });
+
+  describe('when the binary is not found on the system', () => {
+    beforeEach(() => {
+      osPlatformSpy.mockReturnValue('darwin');
+      // @ts-ignore
+      execSyncSpy.mockImplementation(() => {
+        throw new Error('Command failed');
+      });
+    });
+
+    it('should throw a custom error', () => {
+      const BIN_NAME = uuid();
+
+      expect(() => {
+        ensureBin(BIN_NAME);
+      }).toThrow(`The binary "${BIN_NAME}" was not found on your system.`);
+
+      expect(execSyncSpy.mock.calls[0][0].includes(BIN_NAME)).toBe(true);
+    });
+  });
+
+  describe('when other errors occur', () => {
+    const MESSAGE = uuid();
+
+    beforeEach(() => {
+      osPlatformSpy.mockReturnValue('darwin');
+      // @ts-ignore
+      execSyncSpy.mockImplementation(() => {
+        throw new Error(MESSAGE);
+      });
+    });
+
+    it('should throw the error', () => {
+      const BIN_NAME = uuid();
+
+      expect(() => {
+        ensureBin(BIN_NAME);
+      }).toThrow(MESSAGE);
+
+      expect(execSyncSpy.mock.calls[0][0].includes(BIN_NAME)).toBe(true);
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+});
+
+
+describe('ensureFile', () => {
+  let accessSyncSpy: jest.SpyInstance<void, [fs.PathLike, (number | undefined)?]>;
+  let ensureFile: Function;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    accessSyncSpy = jest.spyOn(fs, 'accessSync');
+    ensureFile = require('./utils').ensureFile; // tslint:disable-line no-require-imports
+  });
+
+  describe('when the file exists and is readable', () => {
+    beforeEach(() => {
+      accessSyncSpy.mockReturnValue();
+    });
+
+    it('should return the absolute path to the file', () => {
+      const FILE = `/${uuid()}`;
+      const result = ensureFile(FILE);
+      expect(result).toBe(FILE);
+    });
+  });
+
+  describe('when the file does not exist', () => {
+    beforeEach(() => {
+      accessSyncSpy.mockImplementation(() => {
+        const err = new Error();
+        // @ts-ignore
+        err.code = 'ENOENT';
+        throw err;
+      });
+    });
+
+    it('should throw an error', () => {
+      expect(() => {
+        ensureFile('');
+      }).toThrow('could not be found');
+    });
+  });
+
+  describe('when the file exists but can not be read', () => {
+    beforeEach(() => {
+      accessSyncSpy.mockImplementation(() => {
+        const err = new Error();
+        // @ts-ignore
+        err.code = 'EACCES';
+        throw err;
+      });
+    });
+
+    it('should throw an error', () => {
+      expect(() => {
+        ensureFile('');
+      }).toThrow('could not be read');
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 });

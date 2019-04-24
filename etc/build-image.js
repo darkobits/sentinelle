@@ -21,11 +21,23 @@ function tagAtHead() {
     cwd: process.cwd()
   }).trim().split('\n');
 
+  if (!results) {
+    const err = new Error(`Multiple tags point to the current HEAD: ${results.join(', ')}`);
+    err.code = 'EMULTAGS';
+    throw err;
+  }
+
+  if (results.length > 1) {
+    const err = new Error('No tags point to the current HEAD.');
+    err.code = 'ENOTAG';
+    throw err;
+  }
+
   if (!results || results.length !== 1) {
     return false;
   }
 
-  return results[1];
+  return results[0];
 }
 
 
