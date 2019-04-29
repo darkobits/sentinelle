@@ -254,7 +254,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     // If the process is in such a state that we don't need to stop it, bail.
     if (curProcess.isClosed()) {
-      log.warn('', 'Process is already stopped; nothing to do.');
+      log.verbose('', 'Process is already stopped; nothing to do.');
       return;
     }
 
