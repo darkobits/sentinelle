@@ -28,4 +28,11 @@ export interface Arguments extends Yarguments {
    * Default: SIGINT
    */
   kill?: NodeJS.Signals;
+
+  /**
+   * Suppress all logging except errors and warnings.
+   *
+   * Default: false
+   */
+  quiet?: boolean;
 }

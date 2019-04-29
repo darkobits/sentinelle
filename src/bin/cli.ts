@@ -33,6 +33,13 @@ yargs.option('kill', {
   required: false
 });
 
+yargs.option('quiet', {
+  description: 'Suppress all logging except errors and warnings.',
+  type: 'boolean',
+  default: false,
+  required: false
+});
+
 yargs.showHelpOnFail(true, 'See --help for usage instructions.');
 yargs.wrap(yargs.terminalWidth());
 yargs.version();
@@ -47,9 +54,13 @@ yargs.help();
 async function main() {
   try {
     // Parse command-line arguments, bail on --help, --version, etc.
-    const {_, bin, watch, kill} = yargs.argv as Arguments;
+    const {_, bin, watch, kill, quiet} = yargs.argv as Arguments;
     const [entry, ...extraArgs] = _;
     const sent = SentinelleFactory({bin, entry, extraArgs, watch, processShutdownSignal: kill});
+
+    if (quiet) {
+      log.level = 'warn';
+    }
 
     adeiu(async signal => {
       log.info('', log.chalk.bold(`Got signal ${signal}.`));
