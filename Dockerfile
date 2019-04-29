@@ -2,7 +2,7 @@
 ARG NODE_VERSION=10.14.1
 ARG TINI_VERSION=0.18.0
 
-FROM ubuntu:latest as base
+FROM ubuntu:19.04 as base
 
 # Re-import args.
 ARG TINI_VERSION
