@@ -2,9 +2,11 @@
 
 import adeiu from '@darkobits/adeiu';
 import yargs from 'yargs';
-import SentinelleFactory from 'lib/sentinelle';
+
 import {Arguments} from 'etc/types';
+import SentinelleFactory from 'lib/sentinelle';
 import log from 'lib/log';
+import {getPackageVersion} from 'lib/utils';
 
 
 yargs.usage('Run a process, watch for file changes, and re-start the process.');
@@ -66,6 +68,10 @@ async function main() {
       log.info('', log.chalk.bold(`Got signal ${signal}.`));
       await sent.stop();
     });
+
+    const version = await getPackageVersion();
+
+    log.verbose('version', log.chalk.green.bold(version));
 
     await sent.start();
   } catch (err) {

@@ -32,6 +32,7 @@
     "ms": "^2.1.1",
     "ow": "^0.12.0",
     "p-wait-for": "^3.1.0",
+    "read-pkg-up": "^5.0.0",
     "yargs": "^13.2.2"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "@types/jest": "^24.0.11",
     "@types/ms": "^0.7.30",
     "@types/node": "^11.13.7",
+    "@types/read-pkg-up": "^3.0.1",
     "@types/uuid": "^3.4.4",
     "@types/yargs": "^13.0.0",
     "emittery": "^0.4.1",

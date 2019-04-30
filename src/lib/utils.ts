@@ -1,9 +1,10 @@
+import {execSync} from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import {execSync} from 'child_process';
 import ms from 'ms';
+import readPkgUp from 'read-pkg-up';
 
 
 /**
@@ -84,6 +85,16 @@ export function ensureFile(name: string) {
 
     throw err;
   }
+}
+
+
+/**
+ * Returns a Promise that resolves with the current "version" from our
+ * package.json.
+ */
+export async function getPackageVersion() {
+  const {pkg} = await readPkgUp({cwd: __dirname});
+  return pkg.version;
 }
 
 
