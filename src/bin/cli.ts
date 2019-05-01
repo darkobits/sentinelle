@@ -57,8 +57,9 @@ async function main() {
   try {
     // Parse command-line arguments, bail on --help, --version, etc.
     const {_, bin, watch, kill, quiet} = yargs.argv as Arguments;
-    const [entry, ...extraArgs] = _;
-    const sent = SentinelleFactory({bin, entry, extraArgs, watch, processShutdownSignal: kill});
+    const [entryExpression, ...extraArgs] = _;
+    const [entry, ...entryArgs] = entryExpression.split(' ');
+    const sent = SentinelleFactory({bin, entry, entryArgs, extraArgs, watch, processShutdownSignal: kill});
 
     if (quiet) {
       log.level = 'warn';

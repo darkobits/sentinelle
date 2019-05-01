@@ -21,6 +21,11 @@ export interface SentinelleOptions {
   entry: string;
 
   /**
+   * (Optional) Additional arguments to pass to `entry`.
+   */
+  entryArgs?: Array<string>;
+
+  /**
    * (Optional) Binary to use to run the application or script.
    *
    * Default: node
@@ -71,12 +76,13 @@ export interface SentinelleOptions {
 export default function SentinelleFactory(options: SentinelleOptions) {
   // Validate options.
   ow(options.entry, 'entry', ow.string);
+  ow(options.entryArgs, 'arguments', ow.any(ow.undefined, ow.array.ofType(ow.string)));
   ow(options.bin, 'bin', ow.any(ow.string, ow.undefined));
-  ow(options.extraArgs, 'extra arguments', ow.any(ow.array, ow.undefined));
-  ow(options.watch, 'watchs', ow.any(ow.array, ow.undefined));
+  ow(options.extraArgs, 'extra arguments', ow.any(ow.array.ofType(ow.string), ow.undefined));
+  ow(options.watch, 'watchs', ow.any(ow.array.ofType(ow.string), ow.undefined));
   ow(options.processShutdownGracePeriod, 'process shutdown grace period', ow.any(ow.string, ow.number, ow.undefined));
   ow(options.processShutdownSignal, 'process shutdown signal', ow.any(ow.string, ow.undefined));
-  ow(options.stdio, 'stdio configuration', ow.any(ow.string, ow.array, ow.undefined));
+  ow(options.stdio, 'stdio configuration', ow.any(ow.string, ow.array.ofType(ow.string), ow.undefined));
 
 
   /**
@@ -100,10 +106,19 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
 
   /**
+   * Name of the entrypoint for the process we will manage.
+   *
+   * This will throw if the file is not present or is unreadable.
+   */
+  const entryArgs = options.entryArgs || [];
+  log.silly('entryArgs', entryArgs);
+
+
+  /**
    * Array of any extra arguments to pass to the configured binary, followed by
    * the path to the configured entrypoint.
    */
-  const args = [...(options.extraArgs || []), entry];
+  const args = [...(options.extraArgs || []), entry, ...entryArgs];
 
 
   /**
@@ -300,5 +315,8 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   }
 
 
-  return {start: startProcess, stop};
+  return {
+    start: startProcess,
+    stop
+  };
 }
