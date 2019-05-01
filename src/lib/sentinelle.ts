@@ -8,7 +8,7 @@ import ow from 'ow';
 
 import log from 'lib/log';
 import ProcessDescriptorFactory, {ProcessDescriptor} from 'lib/process-descriptor';
-import {ensureBin, ensureFile, parseTime} from 'lib/utils';
+import {ensureArray, ensureBin, ensureFile, parseTime} from 'lib/utils';
 
 
 /**
@@ -35,7 +35,7 @@ export interface SentinelleOptions {
   /**
    * (Optional) Extra arguments to pass to "bin".
    */
-  extraArgs?: Array<string>;
+  binArgs?: Array<string>;
 
   /**
    * (Optional) Extra files or directories to watch in addition to "entry".
@@ -74,51 +74,40 @@ export interface SentinelleOptions {
  * exiting.
  */
 export default function SentinelleFactory(options: SentinelleOptions) {
-  // Validate options.
-  ow(options.entry, 'entry', ow.string);
-  ow(options.entryArgs, 'arguments', ow.any(ow.undefined, ow.array.ofType(ow.string)));
-  ow(options.bin, 'bin', ow.any(ow.string, ow.undefined));
-  ow(options.extraArgs, 'extra arguments', ow.any(ow.array.ofType(ow.string), ow.undefined));
-  ow(options.watch, 'watchs', ow.any(ow.array.ofType(ow.string), ow.undefined));
-  ow(options.processShutdownGracePeriod, 'process shutdown grace period', ow.any(ow.string, ow.number, ow.undefined));
-  ow(options.processShutdownSignal, 'process shutdown signal', ow.any(ow.string, ow.undefined));
-  ow(options.stdio, 'stdio configuration', ow.any(ow.string, ow.array.ofType(ow.string), ow.undefined));
-
-
   /**
-   * Name of the binary we will use to execute our entry file.
-   *
-   * This will throw if the binary is not present.
+   * Name of the binary we will use to execute our entry file. This will throw
+   * if the binary is not present.
    *
    * Default: node
    */
+  ow(options.bin, 'bin', ow.any(ow.string, ow.undefined));
   const bin = ensureBin(options.bin || 'node');
   log.silly('bin', bin);
 
 
   /**
-   * Name of the entrypoint for the process we will manage.
-   *
-   * This will throw if the file is not present or is unreadable.
+   * (Optional) Additional arguments to pass to `bin`.
    */
+  ow(options.binArgs, 'binArgs', ow.any(ow.array.ofType(ow.string), ow.undefined));
+  const binArgs = ensureArray(options.binArgs);
+  log.silly('binArgs', bin);
+
+
+  /**
+   * Name of the entrypoint for the process we will manage. This will throw if
+   * the file is not present or is unreadable.
+   */
+  ow(options.entry, 'entry', ow.string);
   const entry = ensureFile(options.entry);
   log.silly('entry', entry);
 
 
   /**
-   * Name of the entrypoint for the process we will manage.
-   *
-   * This will throw if the file is not present or is unreadable.
+   * (Optional) Additional arguments to pass to `entry`.
    */
-  const entryArgs = options.entryArgs || [];
+  ow(options.entryArgs, 'entryArgs', ow.any(ow.undefined, ow.array.ofType(ow.string)));
+  const entryArgs = ensureArray(options.entryArgs);
   log.silly('entryArgs', entryArgs);
-
-
-  /**
-   * Array of any extra arguments to pass to the configured binary, followed by
-   * the path to the configured entrypoint.
-   */
-  const args = [...(options.extraArgs || []), entry, ...entryArgs];
 
 
   /**
@@ -126,6 +115,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * the directory of our entry file. The user may provide additional files or
    * directories to watch with the "watch" option.
    */
+  ow(options.watch, 'watch', ow.any(ow.array.ofType(ow.string), ow.undefined));
   const watches = [path.resolve(path.dirname(entry)), ...(options.watch || [])];
   log.silly('watches', watches);
 
@@ -135,6 +125,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * configured shut-down signal. Once this period expires, the process will be
    * forfully terminaled.
    */
+  ow(options.processShutdownGracePeriod, 'processShutdownGracePeriod', ow.any(ow.string, ow.number, ow.undefined));
   const processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '4 seconds');
   log.silly('gracePeriod', `${processShutdownGracePeriod}ms`);
 
@@ -143,6 +134,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Signal we will send to child processes to indicate we want them to shut
    * down.
    */
+  ow(options.processShutdownSignal, 'processShutdownSignal', ow.any(ow.string, ow.undefined));
   const processShutdownSignal = options.processShutdownSignal || 'SIGUSR2';
   log.silly('signal', processShutdownSignal);
 
@@ -150,8 +142,9 @@ export default function SentinelleFactory(options: SentinelleOptions) {
   /**
    * Output options for spawned processes.
    */
-  const spawnStdio = options.stdio || 'pipe';
-  log.silly('stdio', spawnStdio);
+  ow(options.stdio, 'stdio', ow.any(ow.string, ow.array.ofType(ow.string), ow.undefined));
+  const stdio = options.stdio || 'pipe';
+  log.silly('stdio', stdio);
 
 
   /**
@@ -248,9 +241,19 @@ export default function SentinelleFactory(options: SentinelleOptions) {
     }
 
     try {
-      const commandAsString = `${bin.split(path.sep).slice(-1)} ${args.join(' ')}`;
+      // Combine `binArgs`, `entry`, and `entryArgs` into a full list of
+      // arguments to pass to `bin`.
+      const args = [...binArgs, entry, ...entryArgs];
+
+      // Get the name of `bin` from its absolute path.
+      const binName = path.basename(bin);
+
+      // Build a string representing the command we will issue.
+      const commandAsString = `${binName} ${args.join(' ')}`;
       log.info('', log.chalk.bold('Starting:'), log.chalk.green(commandAsString));
-      curProcess = ProcessDescriptorFactory({bin, args, stdio: spawnStdio});
+
+      // Create a new ProcessDescriptor.
+      curProcess = ProcessDescriptorFactory({bin, args, stdio});
     } catch (err) {
       log.error('', err);
     }
@@ -275,7 +278,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     // If the process is already stopping, bail.
     if (curProcess.getState() === 'STOPPING') {
-      log.warn('', 'Process is already stopping; nothing to do.');
+      log.silly('', `Process state is already ${log.chalk.bold('STOPPING')}; nothing to do.`);
       return;
     }
 

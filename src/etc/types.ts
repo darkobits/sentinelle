@@ -4,7 +4,7 @@ import {Arguments as Yarguments} from 'yargs';
 /**
  * Parsed command-line arguemnts we accept.
  *
- * Note: "entry" and "extraArgs" are positional arguments, and are therefore
+ * Note: "entry" and "binArgs" are positional arguments, and are therefore
  * provided via the "_" field.
  */
 export interface Arguments extends Yarguments {

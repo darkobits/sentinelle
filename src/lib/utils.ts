@@ -89,6 +89,23 @@ export function ensureFile(name: string) {
 
 
 /**
+ * If the provided value is an array, returns it. Otherwise, wraps the value in
+ * an array and returns it.
+ */
+export function ensureArray<T>(value: T | Array<T> | null | undefined): Array<T> {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  return [value];
+}
+
+
+/**
  * Returns a Promise that resolves with the current "version" from our
  * package.json.
  */
