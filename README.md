@@ -103,6 +103,7 @@ Additional arguments to pass to `entry`.
 ### `bin`
 
 Type: `string`
+
 Default: `node`
 
 Alternative binary to use to execute `entry`. Sentinelle will use the `which` utility on -nix machines and the `where` utility on Windows machines to locate the binary.
@@ -122,6 +123,7 @@ Additional files and/or directories to watch in addition to the directory contai
 ### `processShutdownGracePeriod`
 
 Type: `string | number`
+
 Default: `'4 seconds'`
 
 Amount of time Sentinelle will wait after issuing a kill signal before forcefully killing a process. If a number is provided, it will be assumed to be the number of milliseconds to wait. If a string is provided, it will be parsed using the [`ms`](https://github.com/zeit/ms) package. Therefore, strings such as `'5 seconds'` are valid.
@@ -129,6 +131,7 @@ Amount of time Sentinelle will wait after issuing a kill signal before forcefull
 ### `processShutdownSignal`
 
 Type: `string`
+
 Default: `SIGUSR2`
 
 [POSIX signal](https://en.wikipedia.org/wiki/Signal_(IPC)#POSIX_signals) to send to a process to indicate that it needs to shut down.
@@ -136,6 +139,7 @@ Default: `SIGUSR2`
 ### `stdio`
 
 Type: `string | Array<string>`
+
 Default: `pipe`
 
 [Input/output configuration](https://nodejs.org/api/child_process.html#child_process_options_stdio) for the spawned process.
@@ -161,7 +165,7 @@ Stops the current process if one is running and closes all file watchers. By def
 Sentinelle respects the `LOG_LEVEL` environment variable, which may be set to any [valid NPM log level](https://github.com/npm/npmlog/blob/master/log.js#L296-L304). To produce additional output, you may set `LOG_LEVEL` to `verbose` or `silly`:
 
 ```
-LOG_LEVEL=silly sentinelle ./server.js`
+LOG_LEVEL=silly sentinelle ./server.js
 ```
 
 ## &nbsp;
