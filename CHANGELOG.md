@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+# [0.5.0](https://github.com/darkobits/sentinelle/compare/v0.4.0...v0.5.0) (2019-05-01)
+
+
+### Features
+
+* Add `restart` method. ([693b09e](https://github.com/darkobits/sentinelle/commit/693b09e))
+* Allow additional arguments to be passed to entrypoint. ([f31dd12](https://github.com/darkobits/sentinelle/commit/f31dd12))
+* Track state of attached Node debuggers. ([d49cd47](https://github.com/darkobits/sentinelle/commit/d49cd47))
+
+
+
 # [0.4.0](https://github.com/darkobits/sentinelle/compare/v0.3.0...v0.4.0) (2019-04-30)
 
 
