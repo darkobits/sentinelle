@@ -3,11 +3,8 @@ import pWaitFor from 'p-wait-for';
 import log from 'lib/log';
 
 
-export type KillReason = 'GRACE_PERIOD_EXPIRED' | 'HANGING_DEBUGGER';
-
-
 /**
- * Possible states a managed process may be in.
+ * Possible states a process may be in.
  */
 export type ProcessState =
   // Process was still running when a restart request was issued. We are still
@@ -25,6 +22,30 @@ export type ProcessState =
   'STARTED' |
   // Process is starting.
   'STARTING';
+
+
+/**
+ * Possible states a process Node debugger may be in.
+ */
+type DebuggerState =
+  // Default state, Node debugger not in use.
+  'DISABLED' |
+  // Process is listening for debuggers to attach.
+  'LISTENING' |
+  // Process has a debugger attached.
+  'ATTACHED' |
+  // Process has exited but an attached debugger is keeping it alive.
+  'HANGING';
+
+
+/**
+ * Possible reasons why Sentinelle may have forcefully killed a process.
+ */
+type KillReason =
+  // Process was killed because the exit grace period expired.
+  'GRACE_PERIOD_EXPIRED' |
+  // Process was killed due to a hanging debugger instance keeping it alive.
+  'HANGING_DEBUGGER';
 
 
 /**
@@ -97,6 +118,15 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   /**
    * @private
    *
+   * Tracks the state of Node debugger instances that may be attached to the
+   * process.
+   */
+  let debuggerState: DebuggerState = 'DISABLED';
+
+
+  /**
+   * @private
+   *
    * Potential reason for why the process might have been forefully killed.
    */
   let killReason: KillReason;
@@ -155,15 +185,32 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * [1]: https://github.com/nodejs/node/issues/7742
    */
   function handleStderrData(chunk: any) {
-    if (/Waiting for the debugger to disconnect/ig.test(Buffer.from(chunk).toString('utf8'))) {
-      log.silly('', 'Detected a hanging debugger instance.');
+    const data = Buffer.from(chunk).toString('utf8');
+
+    if (/Debugger listening on/.test(data)) {
+      debuggerState = 'LISTENING';
+      log.info('', `Set debugger state to ${log.chalk.bold('LISTENING')}.`);
+    }
+
+    if (/Debugger attached/.test(data)) {
+      debuggerState = 'ATTACHED';
+      log.info('', `Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
+    }
+
+    // This scenario tends to arise when a process exits on its own (re: was not
+    // shut-down) and had a debugger instance attached. Whether or not the
+    // debugger was/is paused, Node will keep the process alive and issue the
+    // below message. When we see this message, we know we can safely kill the
+    // process immediately.
+    if (/Waiting for the debugger to disconnect/ig.test(data)) {
+      debuggerState = 'HANGING';
       killReason = 'HANGING_DEBUGGER';
       // Rather than waiting for the grace period to expire, we should kill
       // the process immediately. We can safely assume that the process has
       // exited (as far as the user's code is concerned) because Node only
       // prints the above message when the code has finished executing _but_
       // a debugger is still attached.
-      kill(); // tslint:disable-line no-floating-promises
+      kill('SIGKILL'); // tslint:disable-line no-floating-promises
     }
   }
 
@@ -279,11 +326,23 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    */
   function killAfterGracePeriod(time: any, signal: NodeJS.Signals = 'SIGTERM') {
     setTimeout(() => {
+      // Process has not exited after the grace period and a Node debugger is
+      // attached. It is likely that the process did not exit because the
+      // debugger is paused. In this case, we need to send a SIGKILL to the
+      // process to force it to exit.
+      if (!isClosed() && debuggerState === 'ATTACHED') {
+        log.warn('', `Detected paused debugger; sending ${log.chalk.yellow.bold('SIGKILL')} to process.`);
+        kill('SIGKILL'); // tslint:disable-line no-floating-promises
+        return;
+      }
+
+      // Process has not exited after the grace period
       if (!isClosed()) {
-        log.warn('', 'Grace period expired, sending SIGTERM to process.');
+        log.warn('', `Grace period expired, sending ${log.chalk.yellow.bold('SIGTERM')} to process.`);
         // Set killReason so `handleClose` knows what happened.
         killReason = 'GRACE_PERIOD_EXPIRED';
         kill(signal); // tslint:disable-line no-floating-promises
+        return;
       }
     }, time || 0);
   }
