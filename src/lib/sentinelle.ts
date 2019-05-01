@@ -203,13 +203,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
         return;
       }
 
-      // If the process is otherwise not closed, call stopProcess() and wait.
-      if (!curProcess.isClosed()) {
-        await stopProcess(processShutdownSignal);
-      }
-
-      // Finally, call startProcess() to start a new process.
-      return startProcess();
+      return restartProcess();
     });
 
     /**
@@ -295,6 +289,24 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
 
   /**
+   * Restarts the managed process.
+   */
+  async function restartProcess(signal: NodeJS.Signals = processShutdownSignal) {
+    // If no process has been started, bail.
+    if (!curProcess) {
+      return;
+    }
+
+    // If the process is not closed, call stopProcess() and wait.
+    if (!curProcess.isClosed()) {
+      await stopProcess(signal);
+    }
+
+    await startProcess();
+  }
+
+
+  /**
    * Closes all file watchers and waits for the current process to close. An
    * optional signal may be provided which will be sent to the process.
    */
@@ -320,6 +332,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
   return {
     start: startProcess,
+    restart: restartProcess,
     stop
   };
 }
