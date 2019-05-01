@@ -2,6 +2,7 @@ import fs from 'fs';
 import childProcess from 'child_process';
 import Emittery from 'emittery';
 import uuid from 'uuid/v4';
+import * as utils from 'lib/utils';
 
 
 describe('Sentinelle', () => {
@@ -67,8 +68,9 @@ describe('Sentinelle', () => {
     jest.doMock('lib/utils', () => ({
       ensureBin: jest.fn((bin: string) => bin),
       ensureFile: jest.fn((file: string) => file),
-      randomArrayElement: jest.fn().mockReturnValue(0),
-      parseTime: jest.fn((value: any) => value)
+      randomArrayElement: utils.randomArrayElement,
+      parseTime: utils.parseTime,
+      ensureArray: utils.ensureArray
     }));
 
     const oStatSync = fs.statSync;
@@ -92,7 +94,7 @@ describe('Sentinelle', () => {
     sent = Sentinelle({
       entry: ENTRY,
       bin: BIN,
-      extraArgs: EXTRA_ARGS,
+      binArgs: EXTRA_ARGS,
       watch: EXTRA_WATCHES,
       processShutdownGracePeriod: PROCESS_SHUTDOWN_GRACE_PERIOD,
       processShutdownSignal: PROCESS_SHUTDOWN_SIGNAL,
@@ -113,7 +115,7 @@ describe('Sentinelle', () => {
       ]);
     });
 
-    it('should spawn a child process using the configured "bin", "entry", "extraArgs", and "stdio" options', () => {
+    it('should spawn a child process using the configured "bin", "entry", "binArgs", and "stdio" options', () => {
       expect(spawnSpy.mock.calls[0]).toMatchObject([
         BIN,
         [...EXTRA_ARGS, ENTRY],
