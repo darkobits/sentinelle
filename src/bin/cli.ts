@@ -42,7 +42,9 @@ yargs.option('quiet', {
   required: false
 });
 
-yargs.showHelpOnFail(true, 'See --help for usage instructions.');
+const failMessage = 'See --help for usage instructions.';
+
+yargs.showHelpOnFail(true, failMessage);
 yargs.wrap(yargs.terminalWidth());
 yargs.version();
 yargs.strict();
@@ -57,16 +59,26 @@ async function main() {
   try {
     // Parse command-line arguments, bail on --help, --version, etc.
     const {_, bin, watch, kill, quiet} = yargs.argv as Arguments;
+
+    // Ensure we got at least 1 positional argument. Yargs won't help us with
+    // this outside of sub-commands.
+    if (_.length === 0) {
+      yargs.showHelp();
+      process.stderr.write(`Missing required positional argument: entrypoint\n\n${failMessage}\n`);
+      process.exit(1);
+    }
+
     const [entryExpression, ...binArgs] = _;
     const [entry, ...entryArgs] = entryExpression.split(' ');
-    const sent = SentinelleFactory({bin, entry, entryArgs, binArgs, watch, processShutdownSignal: kill});
 
     if (quiet) {
       log.level = 'warn';
     }
 
+    const sent = SentinelleFactory({bin, entry, entryArgs, binArgs, watch, processShutdownSignal: kill});
+
     adeiu(async signal => {
-      log.info('', log.chalk.bold(`Got signal ${signal}.`));
+      log.info('', log.chalk.bold(`Got signal ${signal}; shutting-down.`));
       await sent.stop();
     });
 
