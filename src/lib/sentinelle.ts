@@ -90,7 +90,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    */
   ow(options.binArgs, 'binArgs', ow.any(ow.array.ofType(ow.string), ow.undefined));
   const binArgs = ensureArray(options.binArgs);
-  log.silly('binArgs', bin);
+  log.silly('binArgs', binArgs);
 
 
   /**
@@ -143,7 +143,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Output options for spawned processes.
    */
   ow(options.stdio, 'stdio', ow.any(ow.string, ow.array.ofType(ow.string), ow.undefined));
-  const stdio = options.stdio || 'pipe';
+  const stdio = options.stdio || ['inherit', 'inherit', 'pipe'];
   log.silly('stdio', stdio);
 
 
