@@ -5,7 +5,9 @@ import uuid from 'uuid/v4';
 
 import {
   isNumerical,
-  parseTime
+  parseTime,
+  ensureArray,
+  randomArrayElement
 } from './utils';
 
 
@@ -202,5 +204,61 @@ describe('ensureFile', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+});
+
+
+describe('ensureArray', () => {
+  describe('when provided an array', () => {
+    it('should return the array as-is', () => {
+      const arr = [uuid()];
+      expect(ensureArray(arr)).toBe(arr);
+    });
+  });
+
+  describe('when provided a non-array', () => {
+    it('should wrap the value in an array and return it', () => {
+      const val = uuid();
+      expect(ensureArray(val)).toEqual([val]);
+    });
+  });
+});
+
+
+describe('getPackageVersion', () => {
+  const VERSION = uuid();
+
+  let getPackageVersion: Function;
+
+  beforeEach(() => {
+    jest.resetModuleRegistry();
+
+    jest.doMock('read-pkg-up', () => {
+      return async () => {
+        return {
+          pkg: {
+            version: VERSION
+          }
+        };
+      };
+    });
+
+    getPackageVersion = require('./utils').getPackageVersion; // tslint:disable-line no-require-imports
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should return the "version" field from the local package.json', async () => {
+    expect(await getPackageVersion()).toBe(VERSION);
+  });
+});
+
+
+describe('randomArrayElement', () => {
+  it('should return a value contained in the provided array', () => {
+    const arr = [uuid(), uuid(), uuid()];
+    expect(arr.includes(randomArrayElement(arr))).toBe(true);
   });
 });

@@ -1,30 +1,29 @@
 import fs from 'fs';
-import childProcess from 'child_process';
 import Emittery from 'emittery';
 import uuid from 'uuid/v4';
 import * as utils from 'lib/utils';
 
 
+// ----- Test Data -------------------------------------------------------------
+
+const ENTRY_PATH = `/${uuid()}`;
+const ENTRY = `${ENTRY_PATH}/${uuid()}`;
+const EXTRA_WATCHES = [`/${uuid()}`, `/${uuid()}.txt`, `/${uuid()}.js`];
+const BIN = uuid();
+const STDIO = uuid();
+const EXTRA_ARGS = [uuid(), uuid(), uuid()];
+const PROCESS_SHUTDOWN_SIGNAL = 'PROCESS_SHUTDOWN_SIGNAL';
+const PROCESS_SHUTDOWN_GRACE_PERIOD = 999325;
+
+
 describe('Sentinelle', () => {
   let sent: any;
 
-  // ----- Test Data -----------------------------------------------------------
-
-  const ENTRY_PATH = `/${uuid()}`;
-  const ENTRY = `${ENTRY_PATH}/${uuid()}`;
-  const EXTRA_WATCHES = [`/${uuid()}`, `/${uuid()}.txt`, `/${uuid()}.js`];
-  const BIN = uuid();
-  const STDIO = uuid();
-  const EXTRA_ARGS = [uuid(), uuid(), uuid()];
-  const PROCESS_SHUTDOWN_SIGNAL = 'PROCESS_SHUTDOWN_SIGNAL';
-  const PROCESS_SHUTDOWN_GRACE_PERIOD = 999325;
-
   let chokidarWatchEmitter: Emittery;
-  let childProcessEmitter: Emittery;
   let chokidarWatchSpy: jest.Mock<Emittery, Array<any>>;
-  let spawnSpy: jest.Mock<childProcess.ChildProcess, [string, Array<string>, childProcess.SpawnOptions]>;
   let setTimeoutSpy: jest.SpyInstance<NodeJS.Timeout, [(...args: Array<any>) => void, number, ...Array<any>]>;
   let statSyncSpy: jest.Mock<fs.Stats, [fs.PathLike]>;
+  let processDescriptorSpy: any;
 
 
   // ----- Mocks ---------------------------------------------------------------
@@ -45,23 +44,6 @@ describe('Sentinelle', () => {
     jest.doMock('chokidar', () => ({
       watch: chokidarWatchSpy
     }));
-
-    childProcessEmitter = new Emittery();
-
-    // @ts-ignore
-    childProcessEmitter.kill = jest.fn(async () => {
-      // console.warn('[kill] Called.');
-      // This sets the process state to "KILLED", but its the only path we can
-      // take without throwing an error, because Emittery only allows us to pass a
-      // single argument to emit();
-      return childProcessEmitter.emit('close', null); // tslint:disable-line no-null-keyword
-    });
-
-    // @ts-ignore
-    spawnSpy = jest.spyOn(childProcess, 'spawn').mockImplementation((...args) => {
-      // console.warn('[spawn] Got args:', args);
-      return childProcessEmitter;
-    });
 
     setTimeoutSpy = jest.spyOn(global, 'setTimeout');
 
@@ -87,6 +69,32 @@ describe('Sentinelle', () => {
       }
 
       return Reflect.apply(oStatSync, fs, [arg]);
+    });
+
+    jest.doMock('lib/process-descriptor', () => {
+      const getState = jest.fn();
+      const kill = jest.fn();
+      const killAfterGracePeriod = jest.fn();
+      const isClosed = jest.fn();
+      const awaitClosed = jest.fn();
+
+      processDescriptorSpy = jest.fn(() => {
+        return {
+          getState,
+          kill,
+          killAfterGracePeriod,
+          isClosed,
+          awaitClosed
+        };
+      });
+
+      processDescriptorSpy.getState = getState;
+      processDescriptorSpy.kill = kill;
+      processDescriptorSpy.killAfterGracePeriod = killAfterGracePeriod;
+      processDescriptorSpy.isClosed = isClosed;
+      processDescriptorSpy.awaitClosed = awaitClosed;
+
+      return processDescriptorSpy;
     });
 
     const Sentinelle = require('./sentinelle').default; // tslint:disable-line no-require-imports
@@ -115,39 +123,37 @@ describe('Sentinelle', () => {
       ]);
     });
 
-    it('should spawn a child process using the configured "bin", "entry", "binArgs", and "stdio" options', () => {
-      expect(spawnSpy.mock.calls[0]).toMatchObject([
-        BIN,
-        [...EXTRA_ARGS, ENTRY],
-        {stdio: STDIO}
-      ]);
+    it('should create a ProcessDescriptor using the configured "bin", "entry", "binArgs", and "stdio" options', () => {
+      expect(processDescriptorSpy.mock.calls[0]).toMatchObject([{
+        bin: BIN,
+        args: [...EXTRA_ARGS, ENTRY],
+        stdio: STDIO
+      }]);
     });
 
     it('should send a kill signal to the child process using the configured signal', async () => {
       await chokidarWatchEmitter.emit('change');
 
       // Assert that we called kill() with SIGINT.
-      // @ts-ignore
-      expect(childProcessEmitter.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
+      expect(processDescriptorSpy.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
     });
 
     it('start a force-kill timeout using the configured grace period', async () => {
       await chokidarWatchEmitter.emit('change');
 
       // Assert that we started a timeout using the configured grace period.
-      // @ts-ignore
-      expect(setTimeoutSpy.mock.calls[0][1]).toBe(PROCESS_SHUTDOWN_GRACE_PERIOD);
+      expect(processDescriptorSpy.killAfterGracePeriod).toHaveBeenCalledWith(PROCESS_SHUTDOWN_GRACE_PERIOD);
     });
 
     it('should start a new child process using the configured parameters', async () => {
       await chokidarWatchEmitter.emit('change');
 
       // Assert that we re-started our process.
-      expect(spawnSpy.mock.calls[1]).toMatchObject([
-        BIN,
-        [...EXTRA_ARGS, ENTRY],
-        {stdio: STDIO}
-      ]);
+      expect(processDescriptorSpy.mock.calls[1]).toMatchObject([{
+        bin: BIN,
+        args: [...EXTRA_ARGS, ENTRY],
+        stdio: STDIO
+      }]);
     });
   });
 
@@ -165,8 +171,7 @@ describe('Sentinelle', () => {
     });
 
     it('should close the managed process', () => {
-      // @ts-ignore
-      expect(childProcessEmitter.kill).toHaveBeenCalledWith(CUSTOM_SIGNAL);
+      expect(processDescriptorSpy.kill).toHaveBeenCalledWith(CUSTOM_SIGNAL);
     });
   });
 
@@ -180,12 +185,10 @@ describe('Sentinelle', () => {
 
   afterEach(() => {
     chokidarWatchEmitter.clearListeners();
-    childProcessEmitter.clearListeners();
 
     jest.unmock('chokidar');
     jest.unmock('lib/utils');
 
-    spawnSpy.mockRestore();
     statSyncSpy.mockRestore();
     setTimeoutSpy.mockRestore();
 
