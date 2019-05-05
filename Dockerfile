@@ -8,56 +8,34 @@ FROM ubuntu:19.04 as base
 ARG TINI_VERSION
 ARG NODE_VERSION
 
+# Create labels indicating versions of Node/Tini used.
+LABEL NODE_VERSION=${NODE_VERSION}
+LABEL TINI_VERSION=${TINI_VERSION}
+
 RUN apt-get update && apt-get install --yes curl
 
 # Download Tini.
 RUN curl --silent --fail --location --output /bin/tini https://github.com/krallin/tini/releases/download/v$TINI_VERSION/tini && chmod +x /bin/tini
 
 # Download and install Node.
-RUN mkdir /nodejs
-RUN curl --silent --fail https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz | tar --gunzip --extract --strip-components=1 --directory=/nodejs
-ENV PATH  /nodejs/bin:$PATH
+RUN curl --silent --fail https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz | tar --gunzip --extract --strip-components=1 --directory=/usr/local
 
-WORKDIR /home/node
+# Create / move to Sentinelle install path.
+WORKDIR /usr/local/lib/node_modules/@darkobits/sentinelle
 
-# Copy manifests.
-COPY package.json /home/node/package.json
-COPY package-lock.json /home/node/package-lock.json
-
-# Copy build artifacts.
-COPY dist /home/node/dist
+# Copy manifests and build artifacts into image.
+COPY package.json package.json
+COPY package-lock.json package-lock.json
+COPY dist dist
 
 # Install production dependencies.
 RUN npm ci --production --skip-optional --ignore-scripts
 
-FROM gcr.io/distroless/cc
-
-# Re-import args.
-ARG NODE_VERSION
-ARG TINI_VERSION
-
-# Create labels indicating versions used.
-LABEL NODE_VERSION=${NODE_VERSION}
-LABEL TINI_VERSION=${TINI_VERSION}
+# Symlink Sentinelle into PATH.
+RUN ln -s /usr/local/lib/node_modules/@darkobits/sentinelle/dist/bin/cli.js /usr/local/bin/sentinelle
 
 # Set an environment variable we can use to determine when we're in Docker.
 ENV IS_DOCKER true
-
-# Copy Tini from base.
-COPY --from=base /bin/tini /bin/tini
-
-# Copy Node from base.
-COPY --from=base /nodejs /nodejs
-ENV PATH /nodejs/bin:$PATH
-
-WORKDIR /home/node
-
-# Copy `sh` and `which`.
-COPY --from=base /bin/which /bin/which
-COPY --from=base /bin/sh /bin/sh
-
-# Copy all relevant files from base stage.
-COPY --from=base /home/node /home/node
 
 WORKDIR /
 
@@ -65,4 +43,4 @@ WORKDIR /
 # Sentinelle. It's important we only use ENTRYPOINT here and not CMD, or any
 # arguments the user provides via `docker run` will be treated as a replacement
 # for CMD, which we don't want.
-ENTRYPOINT ["/bin/tini", "--", "/nodejs/bin/node", "/home/node/dist/bin/cli.js"]
+ENTRYPOINT ["tini", "--", "sentinelle"]
