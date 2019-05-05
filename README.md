@@ -7,7 +7,6 @@
   <a href="https://www.codacy.com/app/darkobits/sentinelle"><img src="https://img.shields.io/codacy/coverage/cb56e2c8b1f744728f4d39ccca0ff4d1.svg?style=flat-square"></a>
   <a href="https://david-dm.org/darkobits/sentinelle"><img src="https://img.shields.io/david/darkobits/sentinelle.svg?style=flat-square"></a>
   <a href="https://github.com/conventional-changelog/standard-version"><img src="https://img.shields.io/badge/conventional%20commits-1.0.0-027dc6.svg?style=flat-square"></a>
-  <a href="https://github.com/sindresorhus/xo"><img src="https://img.shields.io/badge/code_style-XO-e271a5.svg?style=flat-square"></a>
 </p>
 
 A development tool, primarily designed for JavaScript projects, that can be used to watch a set of files and restart a process when they change.
@@ -19,7 +18,7 @@ A development tool, primarily designed for JavaScript projects, that can be used
   * [CLI](#cli)
   * [Node API](#node-api)
   * [Docker Image](#docker-image)
-* [Node Debugger & I/O Configuration](node-debugger--io-configuration)
+* [Node Debugger & I/O Configuration](#node-debugger--io-configuration)
 * [Debugging](#debugging)
 
 # Install
