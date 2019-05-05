@@ -1,4 +1,6 @@
-import {spawn, StdioOptions} from 'child_process';
+import {StdioOptions} from 'child_process';
+
+import execa from 'execa';
 import pWaitFor from 'p-wait-for';
 import log from 'lib/log';
 
@@ -172,29 +174,20 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * @private
    *
    * If the stdio configuration was set to `pipe` for stderr, acts a listener
-   * for stderr's `data` event.
-   *
-   * Q: Why?
-   *
-   * A: So, when our child process is run with the --inspect (or similar)
-   *    flags, the process does not always organically close when the main
-   *    thread dies because Node keeps the debugger alive. This issue should
-   *    have been fixed by [1], but still persists in certain cases, even in
-   *    Node 10.
-   *
-   * [1]: https://github.com/nodejs/node/issues/7742
+   * for stderr's `data` event. This allows us to track the state of Node
+   * debuggers.
    */
   function handleStderrData(chunk: any) {
     const data = Buffer.from(chunk).toString('utf8');
 
     if (/Debugger listening on/.test(data)) {
       debuggerState = 'LISTENING';
-      log.info('', `Set debugger state to ${log.chalk.bold('LISTENING')}.`);
+      log.verbose('', `Set debugger state to ${log.chalk.bold('LISTENING')}.`);
     }
 
     if (/Debugger attached/.test(data)) {
       debuggerState = 'ATTACHED';
-      log.info('', `Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
+      log.verbose('', `Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
     }
 
     // This scenario tends to arise when a process exits on its own (re: was not
@@ -306,7 +299,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * STOPPED, KILLED, or EXITED.
    */
   async function awaitClosed() {
-    return pWaitFor(() => ['STOPPED', 'EXITED', 'KILLED'].includes(state));
+    return pWaitFor(isClosed);
   }
 
 
@@ -352,7 +345,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
 
   setState('STARTING');
 
-  const handle = spawn(bin, args || [], {
+  const handle = execa(bin, args, {
     stdio,
     // Run the child process in detached mode, as this gives us more control
     // over how signals are passed from us to it.
@@ -364,7 +357,11 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   handle.on('close', handleClose);
   handle.on('error', handleError);
 
-  // Set up pipes (if stdio was `pipe`).
+  // Set up pipes as needed.
+  if (handle.stdin) {
+    process.stdin.pipe(handle.stdin);
+  }
+
   if (handle.stdout) {
     handle.stdout.pipe(process.stdout);
   }
@@ -372,8 +369,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   if (handle.stderr) {
     handle.stderr.pipe(process.stderr);
     handle.stderr.on('data', handleStderrData);
-  } else {
-    log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging debugger instances.');
+  } else if (bin.endsWith('node')) {
+    log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
   }
 
   setState('STARTED');
