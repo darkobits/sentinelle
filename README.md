@@ -12,6 +12,16 @@
 
 A development tool, primarily designed for JavaScript projects, that can be used to watch a set of files and restart a process when they change.
 
+## Contents
+
+* [Install](#install)
+* [Use](#use)
+  * [CLI](#cli)
+  * [Node API](#node-api)
+  * [Docker Image](#docker-image)
+* [Node Debugger & I/O Configuration](node-debugger--io-configuration)
+* [Debugging](#debugging)
+
 # Install
 
 In most cases, Sentinelle should be installed as a [development dependency](https://docs.npmjs.com/files/package.json#devdependencies) in your project:
@@ -140,7 +150,7 @@ Default: `SIGUSR2`
 
 Type: `string | Array<string>`
 
-Default: `pipe`
+Default: `['inherit', 'inherit', 'pipe']`
 
 [Input/output configuration](https://nodejs.org/api/child_process.html#child_process_options_stdio) for the spawned process.
 
@@ -160,7 +170,56 @@ Restarts the process. By default, the configured `processShutdownSignal` is sent
 
 Stops the current process if one is running and closes all file watchers. By default, the configured `processShutdownSignal` is sent to the process. However, this may be overridden by providing an optional `signal` argument to this function. Returns a Promise that resolves when this operation is complete.
 
-# Debugging
+
+## Docker Image
+
+Many modern development workflows involve the user of Docker to achieve a more production-like environment. For convenience, Sentinelle is also distributed as a Docker image. This section will walk you through how to download and use it. Working knowledge of Docker and a Docker installation on your machine are assumed.
+
+The Sentinelle Docker image uses Node 10.14.1, and is based on the [`ubuntu:19.04`](https://hub.docker.com/_/ubuntu) image.
+
+### Pull
+
+To pull the latest available version:
+
+`docker pull darkobits/sentinelle:latest`
+
+However, using `latest` is Considered Harmful, as it will not protect you against future breaking changes. Therefore, you should select a specific version to use instead. Every [Git tag in this repository](https://github.com/darkobits/sentinelle/releases) has a [corresponding Docker image tag](https://hub.docker.com/r/darkobits/sentinelle/tags):
+
+`docker pull darkobits/sentinelle:v0.5.0`
+
+### Run
+
+When running the image, everything after the `<image name>` positional argument will be treated as Sentinelle arguments, which are parsed just like the CLI. Remember that environment variables need to be set with the `-e` argument and you will need to volume-mount the directory containing your entrypoint and the files you want to watch.
+
+For completeness, here is a command illustrating setting an environment variable, passing arguments to Docker, to Sentinelle, to the entrypoint, and to Node:
+
+```shell
+docker run \
+  --rm \
+  --tty \
+  --interactive \
+  -e LOG_LEVEL=silly \
+  --volume $(pwd)/src:/app \
+  darkobits/sentinelle:v0.5.0 --quiet "/app/src/server.js --port=80" -- --inspect
+```
+
+This assumes we are in our project's root directory, that our source files are in `src`, and our entrypoint is `src/server.js`.
+
+If the project requires transpilation using a tool like Babel, you would instead want to mount the project's `dist` (or equivalent) folder and use `dist/server.js` as your entrypoint while running Babel in watch mode in another terminal. This will allow you to change source files locally and have Sentinelle restart the application in the Docker container whenever Babel re-transpiles them.
+
+## Node Debugger & I/O Configuration
+
+The Node debugger can make Sentinelle's job harder than it otherwise would be. Nevertheless, debugging is a critical part of development, so Sentinelle tries to work around some of these quirks as best it can.
+
+By default, standard input and standard output are set to `inherit`, which results in the highest quality output and best user experience. However, Sentinelle sets up standard error using `pipe`. You will still see output from standard error, but it may not have full color support.
+
+Sentinelle then monitors standard error, which is where Node writes messages about debuggers, and keeps track of when debuggers connect and disconnect from the child process. By doing this, it can take appropriate action when one of the following scenarios occur:
+
+* **Hanging Debugger**: This happens when a process starts, a debugger attaches, then at some later point the process naturally exits and the debugger is not paused on any breakpoint. When this happens, Node will keep the process alive and write something like `Waiting for the debugger to disconnect...` to standard error. When Sentinelle detects this, it will force-kill the process so that it can cleanly re-start it on the next file change.
+
+* **Paused Debugger**: This happens when a process such as a web-server (which keeps the JavaScript event loop running indefinitely) starts, a debugger attaches, pauses on a breakpoint or `debugger;` statement, and then Sentinelle detects a file change and now needs to shut-down and re-start the process. When this happens, Node will keep the process alive even if the process receives a `SIGINT`. When Sentinelle detects this, it will wait for the configured grace period and then send a `SIGKILL` to the process, which is the only signal that will actually cause Node to release the debugger and allow the process to exit. Note that because the debugger has paused execution, your process will not run any shutdown handlers, resulting in a potentially un-clean exit. To avoid this scenario, ensure execution is resumed before saving any files.
+
+## Debugging
 
 Sentinelle respects the `LOG_LEVEL` environment variable, which may be set to any [valid NPM log level](https://github.com/npm/npmlog/blob/master/log.js#L296-L304). To produce additional output, you may set `LOG_LEVEL` to `verbose` or `silly`:
 
