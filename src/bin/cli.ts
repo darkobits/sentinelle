@@ -46,6 +46,8 @@ const failMessage = 'See --help for usage instructions.';
 
 yargs.showHelpOnFail(true, failMessage);
 yargs.wrap(yargs.terminalWidth());
+yargs.alias('v', 'version');
+yargs.alias('h', 'help');
 yargs.version();
 yargs.strict();
 yargs.help();
