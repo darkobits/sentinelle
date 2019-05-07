@@ -1,6 +1,6 @@
 {
   "name": "@darkobits/sentinelle",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "File watcher / process manager.",
   "license": "WTFPL",
   "author": "darkobits",
