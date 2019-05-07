@@ -117,7 +117,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * The managed process' current state.
    */
-  let state: ProcessState;
+  let _state: ProcessState;
 
 
   /**
@@ -126,7 +126,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Tracks the state of Node debugger instances that may be attached to the
    * process.
    */
-  let debuggerState: DebuggerState = 'DISABLED';
+  let _debuggerState: DebuggerState = 'DISABLED';
 
 
   /**
@@ -134,7 +134,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Potential reason for why the process might have been forefully killed.
    */
-  let killReason: KillReason;
+  let _killReason: KillReason;
 
 
   // ----- Private Methods -----------------------------------------------------
@@ -144,8 +144,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Sets the process' current state.
    */
-  function setState(newState: ProcessState) {
-    state = newState;
+  function _setState(newState: ProcessState) {
+    _state = newState;
     log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
   }
 
@@ -155,7 +155,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Handle the "message" event.
    */
-  function handleMessage(message: any) {
+  function _handleMessage(message: any) {
     log.silly('process', message);
   }
 
@@ -165,7 +165,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Handle the "error" event.
    */
-  function handleError(err: Error) {
+  function _handleError(err: Error) {
     if (err && err.stack) {
       log.error('', 'Child process error:', err.message);
       log.verbose('', err.stack.split('\n').slice(1).join('\n'));
@@ -180,16 +180,16 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * for stderr's `data` event. This allows us to track the state of Node
    * debuggers.
    */
-  function handleStderrData(chunk: any) {
+  function _handleStderrData(chunk: any) {
     const data = Buffer.from(chunk).toString('utf8');
 
     if (/Debugger listening on/.test(data)) {
-      debuggerState = 'LISTENING';
+      _debuggerState = 'LISTENING';
       log.verbose('', `Set debugger state to ${log.chalk.bold('LISTENING')}.`);
     }
 
     if (/Debugger attached/.test(data)) {
-      debuggerState = 'ATTACHED';
+      _debuggerState = 'ATTACHED';
       log.verbose('', `Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
     }
 
@@ -199,8 +199,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // below message. When we see this message, we know we can safely kill the
     // process immediately.
     if (/Waiting for the debugger to disconnect/ig.test(data)) {
-      debuggerState = 'HANGING';
-      killReason = 'HANGING_DEBUGGER';
+      _debuggerState = 'HANGING';
+      _killReason = 'HANGING_DEBUGGER';
       // Rather than waiting for the grace period to expire, we should kill
       // the process immediately. We can safely assume that the process has
       // exited (as far as the user's code is concerned) because Node only
@@ -216,29 +216,29 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Handle the (very complex) "close" event.
    */
-  function handleClose(code: number, signal: string) {
+  function _handleClose(code: number, signal: string) {
     // ----- Exotic Ungraceful Exits -------------------------------------------
 
-    if (killReason === 'GRACE_PERIOD_EXPIRED') {
+    if (_killReason === 'GRACE_PERIOD_EXPIRED') {
       // Process took longer than the grace period to shut-down.
       log.error('', log.chalk.red.bold('Process failed to shut-down in time and was killed.'));
-      setState('KILLED');
+      _setState('KILLED');
       return;
     }
 
-    if (killReason === 'PAUSED_DEBUGGER') {
+    if (_killReason === 'PAUSED_DEBUGGER') {
       // Process was killed because a file change triggered a restart while the
       // debugger had paused execution.
       log.info('', log.chalk.red.dim.bold('Detected paused debugger; process was killed.'));
-      setState('KILLED');
+      _setState('KILLED');
       return;
     }
 
-    if (killReason === 'HANGING_DEBUGGER') {
+    if (_killReason === 'HANGING_DEBUGGER') {
       // Process had a hanging debugger instnace attached and failed to
       // shut-down.
       log.info('', log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
-      setState('KILLED');
+      _setState('KILLED');
       return;
     }
 
@@ -246,18 +246,18 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // ----- Ungraceful Exits --------------------------------------------------
 
     if (code !== 0 && signal === null) {
-      if (state === 'STOPPING') {
+      if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and crashed within the grace
         // period.
         log.error('', log.chalk.red.bold('Process crashed while shutting-down.'));
-        setState('STOPPED');
+        _setState('STOPPED');
         return;
       }
 
-      if (state === 'STARTED') {
+      if (_state === 'STARTED') {
         // Process crashed on its own without requiring an interrupt signal.
         log.error('', log.chalk.red.bold('Process crashed.'));
-        setState('EXITED');
+        _setState('EXITED');
         return;
       }
     }
@@ -266,24 +266,24 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // ----- Graceful Exits ----------------------------------------------------
 
     if (code === 0 || code === null) {
-      if (state === 'STOPPING') {
+      if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and closed cleanly within the
         // grace period.
         log.info('', log.chalk.bold('Process shut-down gracefully.'));
-        setState('STOPPED');
+        _setState('STOPPED');
         return;
       }
 
-      if (state === 'STARTED') {
+      if (_state === 'STARTED') {
         // Process exited cleanly on its own without requiring an interrupt
         // signal.
         log.info('', log.chalk.bold('Process exited cleanly.'));
-        setState('EXITED');
+        _setState('EXITED');
         return;
       }
     }
 
-    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}; State: ${state}`);
+    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}; State: ${_state}`);
   }
 
 
@@ -293,7 +293,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Returns the process' state.
    */
   function getState() {
-    return state;
+    return _state;
   }
 
 
@@ -301,7 +301,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Returns true if the process' state is STOPPED, KILLED, or EXITED.
    */
   function isClosed() {
-    return ['STOPPED', 'EXITED', 'KILLED'].includes(state);
+    return ['STOPPED', 'EXITED', 'KILLED'].includes(_state);
   }
 
 
@@ -319,7 +319,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * promise that resolves when the process has exited.
    */
   async function kill(signal?: NodeJS.Signals) {
-    setState('STOPPING');
+    _setState('STOPPING');
     handle.kill(signal); // tslint:disable-line no-use-before-declare
     return awaitClosed();
   }
@@ -334,8 +334,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       // attached. It is likely that the process did not exit because the
       // debugger is paused. In this case, we need to send a SIGKILL to the
       // process to force it to exit.
-      if (!isClosed() && debuggerState === 'ATTACHED') {
-        killReason = 'PAUSED_DEBUGGER';
+      if (!isClosed() && _debuggerState === 'ATTACHED') {
+        _killReason = 'PAUSED_DEBUGGER';
         kill('SIGKILL'); // tslint:disable-line no-floating-promises
         return;
       }
@@ -344,7 +344,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       if (!isClosed()) {
         log.warn('', `Grace period expired, sending ${log.chalk.yellow.bold('SIGTERM')} to process.`);
         // Set killReason so `handleClose` knows what happened.
-        killReason = 'GRACE_PERIOD_EXPIRED';
+        _killReason = 'GRACE_PERIOD_EXPIRED';
         kill(signal); // tslint:disable-line no-floating-promises
         return;
       }
@@ -354,19 +354,16 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
 
   // ----- Init ----------------------------------------------------------------
 
-  setState('STARTING');
+  _setState('STARTING');
 
-  const handle = execa(bin, args, {
-    stdio,
-    // Run the child process in detached mode, as this gives us more control
-    // over how signals are passed from us to it.
-    detached: true
-  });
+  // Run the child process in detached mode, as this gives us more control over
+  // how signals are passed from us to it.
+  const handle = execa(bin, args, {stdio, detached: true});
 
   // Set up event handlers.
-  handle.on('message', handleMessage);
-  handle.on('close', handleClose);
-  handle.on('error', handleError);
+  handle.on('message', _handleMessage);
+  handle.on('close', _handleClose);
+  handle.on('error', _handleError);
 
   // Set up pipes as needed.
   if (handle.stdin) {
@@ -379,12 +376,12 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
 
   if (handle.stderr) {
     handle.stderr.pipe(process.stderr);
-    handle.stderr.on('data', handleStderrData);
+    handle.stderr.on('data', _handleStderrData);
   } else if (bin.endsWith('node')) {
     log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
   }
 
-  setState('STARTED');
+  _setState('STARTED');
 
 
   return {
