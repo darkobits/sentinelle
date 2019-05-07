@@ -46,6 +46,9 @@ type DebuggerState =
 type KillReason =
   // Process was killed because the exit grace period expired.
   'GRACE_PERIOD_EXPIRED' |
+  // Process was killed because a file change triggered a restart while the
+  // debugger had paused execution.
+  'PAUSED_DEBUGGER' |
   // Process was killed due to a hanging debugger instance keeping it alive.
   'HANGING_DEBUGGER';
 
@@ -214,7 +217,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Handle the (very complex) "close" event.
    */
   function handleClose(code: number, signal: string) {
-    // ----- Exotic Unstable Exits ---------------------------------------------
+    // ----- Exotic Ungraceful Exits -------------------------------------------
 
     if (killReason === 'GRACE_PERIOD_EXPIRED') {
       // Process took longer than the grace period to shut-down.
@@ -223,16 +226,24 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       return;
     }
 
+    if (killReason === 'PAUSED_DEBUGGER') {
+      // Process was killed because a file change triggered a restart while the
+      // debugger had paused execution.
+      log.info('', log.chalk.red.dim.bold('Detected paused debugger; process was killed.'));
+      setState('KILLED');
+      return;
+    }
+
     if (killReason === 'HANGING_DEBUGGER') {
       // Process had a hanging debugger instnace attached and failed to
       // shut-down.
-      log.error('', log.chalk.red.bold('Detected hanging debugger; process was killed.'));
+      log.info('', log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
       setState('KILLED');
       return;
     }
 
 
-    // ----- Unstable Exits ----------------------------------------------------
+    // ----- Ungraceful Exits --------------------------------------------------
 
     if (code !== 0 && signal === null) {
       if (state === 'STOPPING') {
@@ -252,7 +263,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     }
 
 
-    // ----- Clean Exits -------------------------------------------------------
+    // ----- Graceful Exits ----------------------------------------------------
 
     if (code === 0 || code === null) {
       if (state === 'STOPPING') {
@@ -324,7 +335,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       // debugger is paused. In this case, we need to send a SIGKILL to the
       // process to force it to exit.
       if (!isClosed() && debuggerState === 'ATTACHED') {
-        log.warn('', `Detected paused debugger; sending ${log.chalk.yellow.bold('SIGKILL')} to process.`);
+        killReason = 'PAUSED_DEBUGGER';
         kill('SIGKILL'); // tslint:disable-line no-floating-promises
         return;
       }

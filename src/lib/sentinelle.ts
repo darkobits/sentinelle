@@ -179,7 +179,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
     filteredWatches.forEach(watch => {
       const isDir = fs.statSync(watch).isDirectory();
-      log.info('', log.chalk.bold(`Watching ${isDir ? 'directory' : 'file'}:`), log.chalk.green(`${watch}`));
+      log.info('', log.chalk.bold(`Watching ${isDir ? 'directory' : 'file'}`), log.chalk.green(`${watch}`));
     });
 
     watcher = chokidar.watch(filteredWatches);
@@ -244,7 +244,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
 
       // Build a string representing the command we will issue.
       const commandAsString = `${binName} ${args.join(' ')}`;
-      log.info('', log.chalk.bold('Starting:'), log.chalk.green(commandAsString));
+      log.info('', log.chalk.bold('Starting'), log.chalk.green(commandAsString));
 
       // Create a new ProcessDescriptor.
       curProcess = ProcessDescriptorFactory({bin, args, stdio});
