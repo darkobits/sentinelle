@@ -10,7 +10,7 @@ install:
 script:
   - npx nps build
   - npx nps test.coverage -- -- --detectOpenHandles --forceExit
-  - ./etc/build-image.js
+  - npx dockerize
 
 after_success:
   - npm install codacy-coverage

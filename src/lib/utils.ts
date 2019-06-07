@@ -110,8 +110,14 @@ export function ensureArray<T>(value: T | Array<T> | null | undefined): Array<T>
  * package.json.
  */
 export async function getPackageVersion() {
-  const {pkg} = await readPkgUp({cwd: __dirname});
-  return pkg.version;
+  const pkgInfo = await readPkgUp({cwd: __dirname});
+
+  if (!pkgInfo) {
+    throw new Error('Unable to locate a package.json for Senintlle.');
+  }
+
+
+  return pkgInfo.package.version;
 }
 
 
