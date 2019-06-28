@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/darkobits/sentinelle/compare/v0.5.3...v0.6.0) (2019-06-30)
+
+
+### refactor
+
+* Upgrade to execa 2.0.0, update API. ([3783083](https://github.com/darkobits/sentinelle/commit/3783083))
+
+* Sentinelle now supports running any executable file/script as long as it has the appropriate file permissions and begins with a shebang.
+
+
+### BREAKING CHANGES
+
+* This update simplifies how custom arguments are passed to programs and the binary used to execute them. Instead of using "--" followed by custom binary arguments, users may now wrap the --bin argument in quotes and pass any arguments necessary.
+
+
+
 ### [0.5.3](https://github.com/darkobits/sentinelle/compare/v0.5.2...v0.5.3) (2019-06-07)
 
 

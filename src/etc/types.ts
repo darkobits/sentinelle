@@ -2,12 +2,14 @@ import {Arguments as Yarguments} from 'yargs';
 
 
 /**
- * Parsed command-line arguemnts we accept.
- *
- * Note: "entry" and "binArgs" are positional arguments, and are therefore
- * provided via the "_" field.
+ * Parsed command-line arguments we accept.
  */
 export interface Arguments extends Yarguments {
+  /**
+   * Entrypoint to the script/application to run.
+   */
+  entrypoint: string;
+
   /**
    * (Optional) Binary to exec.
    *

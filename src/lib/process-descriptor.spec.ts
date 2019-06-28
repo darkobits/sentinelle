@@ -31,7 +31,8 @@ function createMockProcessHandle(eventEmitter: EventEmitter) {
     stdout,
     stderr,
     emit: eventEmitter.emit.bind(eventEmitter),
-    _eventSpies: eventSpies
+    _eventSpies: eventSpies,
+    catch: jest.fn()
   };
 }
 
@@ -61,7 +62,7 @@ describe('Process Descriptor', () => {
 
     jest.doMock('execa', () => execaSpy);
 
-    const ProcessDescriptor = require('./process-descriptor').default; // tslint:disable-line no-require-imports
+    const ProcessDescriptor = require('./process-descriptor'); // tslint:disable-line no-require-imports
     pd = ProcessDescriptor({bin: BIN, args: ARGS, stdio: STDIO});
   });
 

@@ -41,21 +41,33 @@ Sentinelle consists of a CLI (`sentinelle`) and a Node API. Most users will find
 
 ## CLI
 
-The Sentinelle CLI expects a single positional argument which should be the path to your application's entrypoint. It also accepts the following named arguments, all of which are optional:
+The Sentinelle CLI expects a single positional argument which should be the path to your application's entrypoint:
+
+```
+sentinelle ./server.js
+```
+
+If you need to pass arguments to your entrypoint, this argument should be wrapped in quotation marks:
+
+```
+sentinelle "./server.js --port=8080"
+```
+
+Sentinelle also accepts the following named arguments, all of which are optional:
 
 ### `--bin`
 
-Default: `node`
+Specify a custom runtime to use for executing the provided entrypoint. By default, Sentinelle assumes your entrypoint has executable permissions and contains a [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix)), and will execute the script directly. If this is not the case, or if you need to pass custom arguments to the runtime, this option can be used.
 
-Allows Sentinelle to be used with different languages/runtimes. For example:
+For example, if we needed to run our Node app `server.js` with the `--inspect` flag:
 
 ```
-sentinelle --bin python ./server.py
+sentinelle --bin="node --inspect" ./server.js
 ```
 
 ### `--watch`
 
-By default, Sentinelle always watches the directory containing the entrypoint file. However, if you need to watch additional directories or files, you may use this argument.
+By default, Sentinelle always watches the directory containing the entrypoint file and any of its children. However, if you need to watch additional directories or files, you may use this argument.
 
 ```
 sentinelle --watch ./other-file.js --watch ./other-directory ./server.js
@@ -73,22 +85,6 @@ Default: `false`
 
 Suppress all log messages from Sentinelle except warnings and errors. Equivalent to setting `LOG_LEVEL=warn`.
 
-### Passing Additional Arguments
-
-In some cases you may want to pass additional arguments to your application or to the executable that runs it. For example, if we had an entrypoint of `./server.js` that expects a `--port` argument, and we additionally wanted to debug this application by passing the `--inspect` argument to Node, _and_ we wanted to suppress non-critical logging from Sentinelle, we could do so thusly:
-
-```
-sentinelle --quiet "./server.js --port=8080" -- --inspect
-```
-
-By wrapping the entrypoint in quotes, we can easily pass any positional or named arguments to the entrypoint. Additionally, any arguments that appear after `--` will not be parsed by Sentinelle and will instead be provided as arguments to Node (or the program indicated with a `--bin` argument).
-
-Therefore, the above invocation will cause Sentinelle to run our server by calling the following command:
-
-```
-node --inspect ./server.js --port=8080
-```
-
 ## Node API
 
 Sentinelle's default export is a factory function that accepts a single options object and returns an object with several methods.
@@ -101,27 +97,13 @@ The following options are supported:
 
 Type: `string`
 
-Path to the entrypoint file Sentinelle will run.
-
-### `entryArgs`
-
-Type: `Array<string>`
-
-Additional arguments to pass to `entry`.
+Path to the entrypoint file Sentinelle will run, as well as any additional arguments to pass to it.
 
 ### `bin`
 
 Type: `string`
 
-Default: `node`
-
-Alternative binary to use to execute `entry`. Sentinelle will use the `which` utility on -nix machines and the `where` utility on Windows machines to locate the binary.
-
-### `binArgs`
-
-Type: `Array<string>`
-
-Additional arguments to pass to `bin`.
+Explicitly specify a runtime (`node`, `python`, etc.) to use to invoke `entry`. This option may also contain any custom arguments you may need to pass to the runtime itself.
 
 ### `watch`
 

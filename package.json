@@ -25,11 +25,11 @@
     "prepare": "nps prepare"
   },
   "dependencies": {
-    "@darkobits/adeiu": "^0.2.2",
+    "@darkobits/adeiu": "^0.2.4",
     "@darkobits/env": "^1.0.1",
     "@darkobits/log": "^1.2.3",
     "chokidar": "^3.0.1",
-    "execa": "^1.0.0",
+    "execa": "^2.0.1",
     "ms": "^2.1.2",
     "ow": "^0.13.2",
     "p-wait-for": "^3.1.0",
@@ -38,9 +38,8 @@
   },
   "devDependencies": {
     "@darkobits/dockerize": "^0.1.2",
-    "@darkobits/ts-unified": "^1.6.0",
-    "@types/execa": "^0.9.0",
-    "@types/jest": "^24.0.13",
+    "@darkobits/ts-unified": "^3.0.2",
+    "@types/jest": "^24.0.15",
     "@types/ms": "^0.7.30",
     "@types/node": "^11.13.13",
     "@types/read-pkg-up": "^3.0.1",

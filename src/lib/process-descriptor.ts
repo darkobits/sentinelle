@@ -1,8 +1,12 @@
-import {StdioOptions} from 'child_process';
-
 import execa from 'execa';
 import pWaitFor from 'p-wait-for';
 import log from 'lib/log';
+
+
+/**
+ * Possible options for stdio configuration that we accept.
+ */
+type StdioOption = 'pipe' | 'ignore' | 'inherit';
 
 
 /**
@@ -70,7 +74,7 @@ export interface ProcessDescriptorOptions {
   /**
    * Output configuration for the spawned process.
    */
-  stdio?: StdioOptions;
+  stdio?: StdioOption | Array<StdioOption>;
 }
 
 
@@ -145,8 +149,10 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Sets the process' current state.
    */
   function _setState(newState: ProcessState) {
-    _state = newState;
-    log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
+    if (_state !== newState) {
+      _state = newState;
+      log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
+    }
   }
 
 
@@ -165,10 +171,29 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    *
    * Handle the "error" event.
    */
-  function _handleError(err: Error) {
+  function _handleError(err: Error & execa.ExecaError) {
+    // Error messages from execa that we can safely ignore as they are reported
+    // by us.
+    const ignoreMessages = [
+      'Command failed',
+      'Command was killed with'
+    ];
+
+    if (ignoreMessages.some(m => String(err.message).includes(m))) {
+      return;
+    }
+
     if (err && err.stack) {
-      log.error('', 'Child process error:', err.message);
+      log.error('', `Child process error: ${err.message}`);
       log.verbose('', err.stack.split('\n').slice(1).join('\n'));
+    }
+
+    if (err.exitCodeName === 'ENOENT') {
+      log.error('hint', log.chalk.bold('Did you remember to set a shebang in your entrypoint?'));
+    }
+
+    if (err.exitCodeName === 'EACCES') {
+      log.error('hint', log.chalk.bold('Did you remember to set the executable flag on your entrypoint?'));
     }
   }
 
@@ -242,6 +267,13 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       return;
     }
 
+    if (signal === 'SIGKILL') {
+      // Process closed as a result of SIGKILL.
+      log.info('', log.chalk.bold('Process was killed.'));
+      _setState('KILLED');
+      return;
+    }
+
 
     // ----- Ungraceful Exits --------------------------------------------------
 
@@ -256,7 +288,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
 
       if (_state === 'STARTED') {
         // Process crashed on its own without requiring an interrupt signal.
-        log.error('', log.chalk.red.bold('Process crashed.'));
+        log.error('', log.chalk.red.bold(`Process crashed. ${log.chalk.dim(`(Code: ${code})`)}`));
+
         _setState('EXITED');
         return;
       }
@@ -266,6 +299,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // ----- Graceful Exits ----------------------------------------------------
 
     if (code === 0 || code === null) {
+      log.error('WTF', 'Code:', code, 'Signal', signal);
       if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and closed cleanly within the
         // grace period.
@@ -364,6 +398,10 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   handle.on('message', _handleMessage);
   handle.on('close', _handleClose);
   handle.on('error', _handleError);
+
+  // Prevents unhandled rejection warnings and lets us hook into process crash
+  // information that we don't get with the error handler above.
+  handle.catch(_handleError);
 
   // Set up pipes as needed.
   if (handle.stdin) {

@@ -1,5 +1,3 @@
-
-import {SpawnOptions} from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -7,7 +5,7 @@ import chokidar from 'chokidar';
 import ow from 'ow';
 
 import log from 'lib/log';
-import ProcessDescriptorFactory, {ProcessDescriptor} from 'lib/process-descriptor';
+import ProcessDescriptorFactory, {ProcessDescriptor, ProcessDescriptorOptions} from 'lib/process-descriptor';
 import {ensureArray, ensureBin, ensureFile, parseTime} from 'lib/utils';
 
 
@@ -31,11 +29,6 @@ export interface SentinelleOptions {
    * Default: node
    */
   bin?: string;
-
-  /**
-   * (Optional) Extra arguments to pass to "bin".
-   */
-  binArgs?: Array<string>;
 
   /**
    * (Optional) Extra files or directories to watch in addition to "entry".
@@ -62,7 +55,30 @@ export interface SentinelleOptions {
    *
    * Default: 'inherit'
    */
-  stdio?: SpawnOptions['stdio'];
+  stdio?: ProcessDescriptorOptions['stdio'];
+}
+
+
+/**
+ * Object returned by SentinelleFactory.
+ */
+export interface Sentinelle {
+  /**
+   * Waits for any current managed process to become 'STOPPED', then starts a
+   * new managed process and returns its process descriptor.
+   */
+  start(): Promise<void>;
+
+  /**
+   * Restarts the managed process.
+   */
+  restart(signal?: NodeJS.Signals): Promise<void>;
+
+  /**
+   * Closes all file watchers and waits for the current process to close. An
+   * optional signal may be provided which will be sent to the process.
+   */
+  stop(signal?: NodeJS.Signals): Promise<void>;
 }
 
 
@@ -73,7 +89,7 @@ export interface SentinelleOptions {
  * TODO: Add our own SIGINT handler to gracefully shut-down the process before
  * exiting.
  */
-export default function SentinelleFactory(options: SentinelleOptions) {
+export default function SentinelleFactory(options: SentinelleOptions): Sentinelle {
   /**
    * @private
    *
@@ -83,19 +99,8 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Default: node
    */
   ow(options.bin, 'bin', ow.any(ow.string, ow.undefined));
-  const _bin = ensureBin(options.bin || 'node');
+  const _bin = options.bin;
   log.silly('bin', _bin);
-
-
-  /**
-   * @private
-   *
-   * (Optional) Additional arguments to pass to `bin`.
-   */
-  ow(options.binArgs, 'binArgs', ow.any(ow.array.ofType(ow.string), ow.undefined));
-  const _binArgs = ensureArray(options.binArgs);
-  log.silly('binArgs', _binArgs);
-
 
   /**
    * @private
@@ -104,7 +109,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * the file is not present or is unreadable.
    */
   ow(options.entry, 'entry', ow.string);
-  const _entry = ensureFile(options.entry);
+  const _entry = options.entry;
   log.silly('entry', _entry);
 
 
@@ -140,7 +145,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    * Default: '4 seconds'
    */
   ow(options.processShutdownGracePeriod, 'processShutdownGracePeriod', ow.any(ow.string, ow.number, ow.undefined));
-  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '4 seconds');
+  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '40 seconds');
   log.silly('gracePeriod', `${_processShutdownGracePeriod}ms`);
 
 
@@ -162,7 +167,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    *
    * (Optional) Output options for spawned processes.
    */
-  ow(options.stdio, 'stdio', ow.any(ow.string, ow.array.ofType(ow.string), ow.undefined));
+  ow(options.stdio, 'stdio', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
   const _stdio = options.stdio || ['inherit', 'inherit', 'pipe'];
   log.silly('stdio', _stdio);
 
@@ -172,7 +177,7 @@ export default function SentinelleFactory(options: SentinelleOptions) {
    *
    * Chokidar instance we will create when we start.
    */
-  let _watcher: chokidar.FSWatcher;
+  let _watcher: chokidar.FSWatcher | undefined;
 
 
   /**
@@ -266,13 +271,12 @@ export default function SentinelleFactory(options: SentinelleOptions) {
       return;
     }
 
-    // If the process is already stopping, bail.
-    if (_curProcess.getState() === 'STOPPING') {
-      log.silly('', `Process state is already ${log.chalk.bold('STOPPING')}; nothing to do.`);
-      return;
+    if (signal === 'SIGKILL') {
+      log.info('', log.chalk.bold('Forcefully stopping process...'));
+    } else {
+      log.info('', log.chalk.bold('Stopping process...'));
     }
 
-    log.info('', log.chalk.bold('Stopping process...'));
     log.silly('', `Sending signal ${log.chalk.yellow.bold(signal)} to process.`);
 
     const closedPromise = _curProcess.kill(signal);
@@ -301,21 +305,33 @@ export default function SentinelleFactory(options: SentinelleOptions) {
     }
 
     try {
-      // Combine `binArgs`, `entry`, and `entryArgs` into a full list of
-      // arguments to pass to `bin`.
-      const args = [..._binArgs, _entry, ..._entryArgs];
+      // Split-out "bin" from any arguments to be passed to it.
+      const [bin, ...binArgs] = _bin ? _bin.split(' ') : ['', ''];
 
-      // Get the name of `bin` from its absolute path.
-      const binName = path.basename(_bin);
+      // Split out "entry" from any arguments to be passed to it.
+      const [entry, ...entryArgs] = _entry.split(' ');
 
-      // Build a string representing the command we will issue.
-      const commandAsString = `${binName} ${args.join(' ')}`;
+      // If using the "bin" option, our final executable will be "bin".
+      // Otherwise, use "entry" directly.
+      const finalBin = bin ? ensureBin(bin) : ensureFile(entry);
+
+      // If "bin" is being used, our final arguments array will consist of any
+      // extra arguments to pass to "bin", then our "entry", then any extra
+      // arguments to pass to "entry". If not using "bin", our final arguments
+      // array is just any extra arguments to pass to "entry".
+      const finalArgs = bin ? [...binArgs, entry, ...entryArgs] : entryArgs;
+
+      // Build a string representing the command we will issue. We use the
+      // original version of "bin" here rather than the full path to keep things
+      // readable.
+      const commandAsString = `${bin || entry} ${finalArgs.join(' ')}`;
       log.info('', log.chalk.bold('Starting'), log.chalk.green(commandAsString));
 
       // Create a new ProcessDescriptor.
-      _curProcess = ProcessDescriptorFactory({bin: _bin, args, stdio: _stdio});
+      _curProcess = ProcessDescriptorFactory({bin: finalBin, args: finalArgs, stdio: _stdio});
     } catch (err) {
-      log.error('', err);
+      log.error('', err.message);
+      log.verbose('', err.stack.split('\n').slice(1).join('\n'));
     }
   }
 
@@ -350,15 +366,15 @@ export default function SentinelleFactory(options: SentinelleOptions) {
     log.verbose('', 'Shutting down.');
 
     // Close watchers.
-    _watcher.close();
-    log.silly('', 'My watch has ended.');
+    if (_watcher) {
+      _watcher.close();
+      _watcher = undefined;
+      log.silly('', 'My watch has ended.');
+    }
 
     // Close process.
-    log.silly('', `Stopping process with signal ${log.chalk.bold(signal)}`);
+    log.silly('', `Stopping process with signal ${log.chalk.bold(signal)}.`);
     await _stopProcess(signal);
-    log.silly('', 'Process closed.');
-
-    log.verbose('', 'Done.');
   }
 
 

@@ -7,11 +7,10 @@ import * as utils from 'lib/utils';
 // ----- Test Data -------------------------------------------------------------
 
 const ENTRY_PATH = `/${uuid()}`;
-const ENTRY = `${ENTRY_PATH}/${uuid()}`;
+const ENTRY = `${ENTRY_PATH}/__ENTRY__ __EXTRA_ARG_1__ __EXTRA_ARG_2__`;
 const EXTRA_WATCHES = [`/${uuid()}`, `/${uuid()}.txt`, `/${uuid()}.js`];
-const BIN = uuid();
-const STDIO = uuid();
-const EXTRA_ARGS = [uuid(), uuid(), uuid()];
+const BIN = '__BIN__ __BIN_ARG_1__';
+const STDIO = '__STDIO__';
 const PROCESS_SHUTDOWN_SIGNAL = 'PROCESS_SHUTDOWN_SIGNAL';
 const PROCESS_SHUTDOWN_GRACE_PERIOD = 999325;
 
@@ -97,12 +96,11 @@ describe('Sentinelle', () => {
       return processDescriptorSpy;
     });
 
-    const Sentinelle = require('./sentinelle').default; // tslint:disable-line no-require-imports
+    const Sentinelle = require('./sentinelle'); // tslint:disable-line no-require-imports
 
     sent = Sentinelle({
-      entry: ENTRY,
       bin: BIN,
-      binArgs: EXTRA_ARGS,
+      entry: ENTRY,
       watch: EXTRA_WATCHES,
       processShutdownGracePeriod: PROCESS_SHUTDOWN_GRACE_PERIOD,
       processShutdownSignal: PROCESS_SHUTDOWN_SIGNAL,
@@ -121,14 +119,6 @@ describe('Sentinelle', () => {
         ENTRY_PATH,
         ...EXTRA_WATCHES
       ]);
-    });
-
-    it('should create a ProcessDescriptor using the configured "bin", "entry", "binArgs", and "stdio" options', () => {
-      expect(processDescriptorSpy.mock.calls[0]).toMatchObject([{
-        bin: BIN,
-        args: [...EXTRA_ARGS, ENTRY],
-        stdio: STDIO
-      }]);
     });
 
     it('should send a kill signal to the child process using the configured signal', async () => {
@@ -150,10 +140,44 @@ describe('Sentinelle', () => {
 
       // Assert that we re-started our process.
       expect(processDescriptorSpy.mock.calls[1]).toMatchObject([{
-        bin: BIN,
-        args: [...EXTRA_ARGS, ENTRY],
+        bin: '__BIN__',
+        args: ['__BIN_ARG_1__', ...ENTRY.split(' ')],
         stdio: STDIO
       }]);
+    });
+
+    describe('when the "bin" option is used', () => {
+      it('should create a ProcessDescriptor using the configured "bin", "entry", and "stdio" options', () => {
+        expect(processDescriptorSpy.mock.calls[0]).toMatchObject([{
+          bin: '__BIN__',
+          args: ['__BIN_ARG_1__', ...ENTRY.split(' ')],
+          stdio: STDIO
+        }]);
+      });
+    });
+
+    describe('when the "bin" option is not used', () => {
+      beforeEach(async () => {
+        const Sentinelle = require('./sentinelle'); // tslint:disable-line no-require-imports
+
+        sent = Sentinelle({
+          entry: ENTRY,
+          watch: EXTRA_WATCHES,
+          processShutdownGracePeriod: PROCESS_SHUTDOWN_GRACE_PERIOD,
+          processShutdownSignal: PROCESS_SHUTDOWN_SIGNAL,
+          stdio: STDIO
+        });
+
+        await sent.start();
+      });
+
+      it('should create a ProcessDescriptor using the configured "bin", "entry", and "stdio" options', () => {
+        expect(processDescriptorSpy.mock.calls[0]).toMatchObject([{
+          bin: '__BIN__',
+          args: ['__BIN_ARG_1__', ...ENTRY.split(' ')],
+          stdio: STDIO
+        }]);
+      });
     });
   });
 
