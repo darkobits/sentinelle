@@ -145,7 +145,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * Default: '4 seconds'
    */
   ow(options.processShutdownGracePeriod, 'processShutdownGracePeriod', ow.any(ow.string, ow.number, ow.undefined));
-  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '40 seconds');
+  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '4 seconds');
   log.silly('gracePeriod', `${_processShutdownGracePeriod}ms`);
 
 
