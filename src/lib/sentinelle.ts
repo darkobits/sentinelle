@@ -39,7 +39,7 @@ export interface SentinelleOptions {
    * (Optional) Time to wait after issuing an interrupt signal to a process
    * before killing it.
    *
-   * Default: 6 seconds
+   * Default: 4 seconds
    */
   processShutdownGracePeriod?: number | string;
 

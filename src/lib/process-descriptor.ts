@@ -299,7 +299,6 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // ----- Graceful Exits ----------------------------------------------------
 
     if (code === 0 || code === null) {
-      log.error('WTF', 'Code:', code, 'Signal', signal);
       if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and closed cleanly within the
         // grace period.
