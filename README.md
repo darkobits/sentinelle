@@ -182,7 +182,7 @@ docker run \
   -e LOG_LEVEL=silly \
   --volume $(pwd)/src:/app/src \
   --volume $(pwd)/node_modules:/app/node_modules \
-  darkobits/sentinelle:0.6.2 --bin="node --inspect" "/app/src/server.js --port=80"
+  darkobits/sentinelle:0.6.3 --bin="node --inspect" "/app/src/server.js --port=80"
 ```
 
 This assumes we are in our project's root directory, that our source files are in `src`, and our entrypoint is `src/server.js`.
