@@ -2,59 +2,12 @@ import execa from 'execa';
 import pWaitFor from 'p-wait-for';
 import log from 'lib/log';
 
-
-/**
- * Possible options for stdio configuration that we accept.
- */
-type StdioOption = 'pipe' | 'ignore' | 'inherit';
-
-
-/**
- * Possible states a process may be in.
- */
-export type ProcessState =
-  // Process was still running when a restart request was issued. We are still
-  // waiting for it to shut-down.
-  'STOPPING' |
-  // Process was still running when a restart request was issued. It then shut
-  // down on its own within the allowed grace period.
-  'STOPPED' |
-  // Process was still running when a restart request was issued. It did not
-  // shut-down within the allowed grace period and had to be killed.
-  'KILLED' |
-  // Process exited on its own before a restart request was issued.
-  'EXITED' |
-  // Process was started successfully.
-  'STARTED' |
-  // Process is starting.
-  'STARTING';
-
-
-/**
- * Possible states a process Node debugger may be in.
- */
-type DebuggerState =
-  // Default state, Node debugger not in use.
-  'DISABLED' |
-  // Process is listening for debuggers to attach.
-  'LISTENING' |
-  // Process has a debugger attached.
-  'ATTACHED' |
-  // Process has exited but an attached debugger is keeping it alive.
-  'HANGING';
-
-
-/**
- * Possible reasons why Sentinelle may have forcefully killed a process.
- */
-type KillReason =
-  // Process was killed because the exit grace period expired.
-  'GRACE_PERIOD_EXPIRED' |
-  // Process was killed because a file change triggered a restart while the
-  // debugger had paused execution.
-  'PAUSED_DEBUGGER' |
-  // Process was killed due to a hanging debugger instance keeping it alive.
-  'HANGING_DEBUGGER';
+import {
+  DebuggerState,
+  KillReason,
+  ProcessState,
+  StdioOption
+} from 'etc/types';
 
 
 /**
@@ -75,6 +28,11 @@ export interface ProcessDescriptorOptions {
    * Output configuration for the spawned process.
    */
   stdio?: StdioOption | Array<StdioOption>;
+
+  /**
+   * Number of milliseconds to wait before forcefully killing a process.
+   */
+  shutdownGracePeriod: number;
 }
 
 
@@ -94,11 +52,6 @@ export interface ProcessDescriptor {
   kill(signal?: NodeJS.Signals): Promise<void>;
 
   /**
-   * Kills the process after the indicated grace period.
-   */
-  killAfterGracePeriod(time: number, signal?: NodeJS.Signals): void;
-
-  /**
    * Returns true if the process' state is STOPPED, KILLED, or EXITED.
    */
   isClosed(): boolean;
@@ -115,7 +68,15 @@ export interface ProcessDescriptor {
  * Returns a new process descriptor representing a managed process and its
  * state.
  */
-export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDescriptorOptions): ProcessDescriptor {
+export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGracePeriod}: ProcessDescriptorOptions): ProcessDescriptor {
+  /**
+   * @private
+   *
+   * Child process/promise returned by Execa.
+   */
+  let _process: execa.ExecaChildProcess;
+
+
   /**
    * @private
    *
@@ -139,6 +100,14 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    * Potential reason for why the process might have been forefully killed.
    */
   let _killReason: KillReason;
+
+
+  /**
+   * @private
+   *
+   * Number of milliseconds to wait before forcefully killing a process.
+   */
+  const _shutdownGracePeriod = shutdownGracePeriod || 4000;
 
 
   // ----- Private Methods -----------------------------------------------------
@@ -176,7 +145,10 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
     // by us.
     const ignoreMessages = [
       'Command failed',
-      'Command was killed with'
+      'Command was killed with',
+      // Issue appeared in execa 2.0.0 and seems to only occur when detached is
+      // true.
+      'Cannot destructure property `error`'
     ];
 
     if (ignoreMessages.some(m => String(err.message).includes(m))) {
@@ -251,6 +223,13 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       return;
     }
 
+    if (signal === 'SIGKILL') {
+      // Process closed as a result of SIGKILL.
+      log.error('', log.chalk.red.bold('Process was killed.'));
+      _setState('KILLED');
+      return;
+    }
+
     if (_killReason === 'PAUSED_DEBUGGER') {
       // Process was killed because a file change triggered a restart while the
       // debugger had paused execution.
@@ -263,13 +242,6 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
       // Process had a hanging debugger instnace attached and failed to
       // shut-down.
       log.info('', log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
-      _setState('KILLED');
-      return;
-    }
-
-    if (signal === 'SIGKILL') {
-      // Process closed as a result of SIGKILL.
-      log.info('', log.chalk.bold('Process was killed.'));
       _setState('KILLED');
       return;
     }
@@ -320,6 +292,34 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   }
 
 
+  /**
+   * @private
+   *
+   * Kills the process after the indicated grace period.
+   */
+  function _killAfterGracePeriod(signal: NodeJS.Signals) {
+    setTimeout(() => {
+      // Process has not exited after the grace period and a Node debugger is
+      // attached. It is likely that the process did not exit because the
+      // debugger is paused. In this case, we need to send a SIGKILL to the
+      // process to force it to exit.
+      if (!isClosed() && _debuggerState === 'ATTACHED') {
+        _killReason = 'PAUSED_DEBUGGER';
+        kill('SIGKILL'); // tslint:disable-line no-floating-promises
+        return;
+      }
+
+      // Process has not exited after the grace period
+      if (!isClosed()) {
+        // Set killReason so `handleClose` knows what happened.
+        _killReason = 'GRACE_PERIOD_EXPIRED';
+        kill(signal); // tslint:disable-line no-floating-promises
+        return;
+      }
+    }, _shutdownGracePeriod);
+  }
+
+
   // ----- Public Methods ------------------------------------------------------
 
   /**
@@ -353,35 +353,9 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
    */
   async function kill(signal?: NodeJS.Signals) {
     _setState('STOPPING');
-    handle.kill(signal); // tslint:disable-line no-use-before-declare
+    _process.kill(signal); // tslint:disable-line no-use-before-declare
+    _killAfterGracePeriod('SIGKILL');
     return awaitClosed();
-  }
-
-
-  /**
-   * Kills the process after the indicated grace period.
-   */
-  function killAfterGracePeriod(time: any, signal: NodeJS.Signals = 'SIGTERM') {
-    setTimeout(() => {
-      // Process has not exited after the grace period and a Node debugger is
-      // attached. It is likely that the process did not exit because the
-      // debugger is paused. In this case, we need to send a SIGKILL to the
-      // process to force it to exit.
-      if (!isClosed() && _debuggerState === 'ATTACHED') {
-        _killReason = 'PAUSED_DEBUGGER';
-        kill('SIGKILL'); // tslint:disable-line no-floating-promises
-        return;
-      }
-
-      // Process has not exited after the grace period
-      if (!isClosed()) {
-        log.warn('', `Grace period expired, sending ${log.chalk.yellow.bold('SIGTERM')} to process.`);
-        // Set killReason so `handleClose` knows what happened.
-        _killReason = 'GRACE_PERIOD_EXPIRED';
-        kill(signal); // tslint:disable-line no-floating-promises
-        return;
-      }
-    }, time || 0);
   }
 
 
@@ -391,29 +365,30 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
 
   // Run the child process in detached mode, as this gives us more control over
   // how signals are passed from us to it.
-  const handle = execa(bin, args, {stdio, detached: true});
+  _process = execa(bin, args, {stdio, detached: true});
 
   // Set up event handlers.
-  handle.on('message', _handleMessage);
-  handle.on('close', _handleClose);
-  handle.on('error', _handleError);
+  _process.on('message', _handleMessage);
+  _process.on('close', _handleClose);
+  _process.on('error', _handleError);
+  // console.warn('[ProcessDescriptor] I have attached _handleError to the "error" event of this object:', _process);
 
   // Prevents unhandled rejection warnings and lets us hook into process crash
   // information that we don't get with the error handler above.
-  handle.catch(_handleError);
+  _process.catch(_handleError);
 
   // Set up pipes as needed.
-  if (handle.stdin) {
-    process.stdin.pipe(handle.stdin);
+  if (_process.stdin) {
+    process.stdin.pipe(_process.stdin);
   }
 
-  if (handle.stdout) {
-    handle.stdout.pipe(process.stdout);
+  if (_process.stdout) {
+    _process.stdout.pipe(process.stdout);
   }
 
-  if (handle.stderr) {
-    handle.stderr.pipe(process.stderr);
-    handle.stderr.on('data', _handleStderrData);
+  if (_process.stderr) {
+    _process.stderr.pipe(process.stderr);
+    _process.stderr.on('data', _handleStderrData);
   } else if (bin.endsWith('node')) {
     log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
   }
@@ -424,7 +399,6 @@ export default function ProcessDescriptorFactory({bin, args, stdio}: ProcessDesc
   return {
     getState,
     kill,
-    killAfterGracePeriod,
     isClosed,
     awaitClosed
   };

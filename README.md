@@ -75,9 +75,9 @@ sentinelle --watch ./other-file.js --watch ./other-directory ./server.js
 
 ### `--kill`
 
-Default: `SIGUSR2`
+Default: `SIGINT`
 
-Instructs Sentinelle to use a different signal when restarting an application. By default, processes will receive the `SIGUSR2` signal when Sentinelle needs them to shut-down due to a file change or because the user issued a `SIGINT` (via CTRL+C, for example).
+Instructs Sentinelle to use a different signal when restarting an application. By default, processes will receive the `SIGINT` signal when Sentinelle needs them to shut-down due to a file change or because the user issued a `SIGINT` (via CTRL+C, for example).
 
 ### `--quiet`
 
@@ -123,7 +123,7 @@ Amount of time Sentinelle will wait after issuing a kill signal before forcefull
 
 Type: `string`
 
-Default: `SIGUSR2`
+Default: `SIGINT`
 
 [POSIX signal](https://en.wikipedia.org/wiki/Signal_(IPC)#POSIX_signals) to send to a process to indicate that it needs to shut down.
 
@@ -154,7 +154,7 @@ Stops the current process if one is running and closes all file watchers. By def
 
 ## Docker Image
 
-Many modern development workflows involve the user of Docker to achieve a more production-like environment. For convenience, Sentinelle is also distributed as a Docker image. This section will walk you through how to download and use it. Working knowledge of Docker and a Docker installation on your machine are assumed.
+Many modern development workflows involve the use of Docker to achieve a more production-like environment. For convenience, Sentinelle is also distributed as a Docker image. This section will walk you through how to download and use it. Working knowledge of Docker and a Docker installation on your machine are assumed.
 
 The Sentinelle Docker image uses Node 10.14.1, and is based on the [`ubuntu:19.04`](https://hub.docker.com/_/ubuntu) image.
 
@@ -180,8 +180,9 @@ docker run \
   --tty \
   --interactive \
   -e LOG_LEVEL=silly \
-  --volume $(pwd)/src:/app \
-  darkobits/sentinelle:0.6.0 --bin="node --inspect" "/app/src/server.js --port=80"
+  --volume $(pwd)/src:/app/src \
+  --volume $(pwd)/node_modules:/app/node_modules \
+  darkobits/sentinelle:0.6.2 --bin="node --inspect" "/app/src/server.js --port=80"
 ```
 
 This assumes we are in our project's root directory, that our source files are in `src`, and our entrypoint is `src/server.js`.

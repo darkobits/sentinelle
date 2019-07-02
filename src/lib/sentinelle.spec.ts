@@ -128,13 +128,6 @@ describe('Sentinelle', () => {
       expect(processDescriptorSpy.kill.mock.calls[0][0]).toBe(PROCESS_SHUTDOWN_SIGNAL);
     });
 
-    it('start a force-kill timeout using the configured grace period', async () => {
-      await chokidarWatchEmitter.emit('change');
-
-      // Assert that we started a timeout using the configured grace period.
-      expect(processDescriptorSpy.killAfterGracePeriod).toHaveBeenCalledWith(PROCESS_SHUTDOWN_GRACE_PERIOD);
-    });
-
     it('should start a new child process using the configured parameters', async () => {
       await chokidarWatchEmitter.emit('change');
 
@@ -198,14 +191,6 @@ describe('Sentinelle', () => {
       expect(processDescriptorSpy.kill).toHaveBeenCalledWith(CUSTOM_SIGNAL);
     });
   });
-
-  // TODO: Actually test for something here.
-  // describe('on watcher errors', () => {
-  //   it('should log an error event?', async () => {
-  //     const err = new Error(uuid());
-  //     await chokidarWatchEmitter.emit('error', err);
-  //   });
-  // });
 
   afterEach(() => {
     chokidarWatchEmitter.clearListeners();

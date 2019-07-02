@@ -4,6 +4,7 @@ import path from 'path';
 import chokidar from 'chokidar';
 import ow from 'ow';
 
+import {DEFAULT_KILL_SIGNAL, DEFAULT_SHUTDOWN_GRACE_PERIOD} from 'etc/constants';
 import log from 'lib/log';
 import ProcessDescriptorFactory, {ProcessDescriptor, ProcessDescriptorOptions} from 'lib/process-descriptor';
 import {ensureArray, ensureBin, ensureFile, parseTime} from 'lib/utils';
@@ -145,7 +146,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * Default: '4 seconds'
    */
   ow(options.processShutdownGracePeriod, 'processShutdownGracePeriod', ow.any(ow.string, ow.number, ow.undefined));
-  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || '4 seconds');
+  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || DEFAULT_SHUTDOWN_GRACE_PERIOD) as number;
   log.silly('gracePeriod', `${_processShutdownGracePeriod}ms`);
 
 
@@ -155,10 +156,10 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * (Optional) Signal we will send to child processes to indicate we want them
    * to shut down.
    *
-   * Default: SIGUSR2
+   * Default: SIGINT
    */
   ow(options.processShutdownSignal, 'processShutdownSignal', ow.any(ow.string, ow.undefined));
-  const _processShutdownSignal = options.processShutdownSignal || 'SIGUSR2';
+  const _processShutdownSignal = options.processShutdownSignal || DEFAULT_KILL_SIGNAL;
   log.silly('signal', _processShutdownSignal);
 
 
@@ -279,12 +280,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
 
     log.silly('', `Sending signal ${log.chalk.yellow.bold(signal)} to process.`);
 
-    const closedPromise = _curProcess.kill(signal);
-
-    // Schedule the current process to be killed after the grace period.
-    _curProcess.killAfterGracePeriod(_processShutdownGracePeriod || 0);
-
-    await closedPromise;
+    await _curProcess.kill(signal);
   }
 
 
@@ -328,7 +324,12 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
       log.info('', log.chalk.bold('Starting'), log.chalk.green(commandAsString));
 
       // Create a new ProcessDescriptor.
-      _curProcess = ProcessDescriptorFactory({bin: finalBin, args: finalArgs, stdio: _stdio});
+      _curProcess = ProcessDescriptorFactory({
+        bin: finalBin,
+        args: finalArgs,
+        stdio: _stdio,
+        shutdownGracePeriod: _processShutdownGracePeriod
+      });
     } catch (err) {
       log.error('', err.message);
       log.verbose('', err.stack.split('\n').slice(1).join('\n'));

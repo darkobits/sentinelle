@@ -1,5 +1,6 @@
-// import uuid from 'uuid/v4';
 import EventEmitter from 'events';
+
+import log from 'lib/log';
 
 
 // ----- Test Helpers ----------------------------------------------------------
@@ -17,8 +18,6 @@ function createMockProcessHandle(eventEmitter: EventEmitter) {
 
   return {
     on: jest.fn((eventName, handler) => {
-      // console.warn('[on] Called with:', eventName, handler);
-
       const wrappedHandler = jest.fn(handler);
       eventSpies[eventName] = wrappedHandler;
       return eventEmitter.on(eventName, wrappedHandler);
@@ -45,7 +44,6 @@ const STDIO = ['__STDIO1__', '__STDIO2__', '__STDIO3__'];
 
 
 describe('Process Descriptor', () => {
-  // let ProcessDescriptor: Function;
   let execaSpy: jest.SpyInstance;
   let processHandle: any;
   let pd: any;
@@ -88,11 +86,43 @@ describe('Process Descriptor', () => {
       await processHandle.emit('message');
       expect(processHandle._eventSpies.message).toHaveBeenCalled();
 
-      await processHandle.emit('close', 0, 'SIGUSR2');
+      await processHandle.emit('close', 0, 'SIGINT');
       expect(processHandle._eventSpies.close).toHaveBeenCalled();
 
       await processHandle.emit('error', new Error());
       expect(processHandle._eventSpies.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('handling errors', () => {
+    let warnSpy: jest.SpyInstance<void, [string, any, ...Array<any>]>;
+    let errorSpy: jest.SpyInstance<void, [string, any, ...Array<any>]>;
+
+    beforeEach(() => {
+      warnSpy = jest.spyOn(log, 'warn');
+      errorSpy = jest.spyOn(log, 'error');
+    });
+
+    it('should ignore selected error messages', () => {
+      processHandle.emit('error', new Error('Command failed'));
+      processHandle.emit('error', new Error('Command was killed with'));
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should issue hints on appropriate errors', () => {
+      const enoentErr = new Error('ENOENT');
+      // @ts-ignore
+      enoentErr.exitCodeName = 'ENOENT';
+      processHandle.emit('error', enoentErr);
+      expect(errorSpy.mock.calls[1][1]).toMatch('shebang');
+
+      const eaccesErr = new Error('EACCES');
+      // @ts-ignore
+      eaccesErr.exitCodeName = 'EACCES';
+      processHandle.emit('error', eaccesErr);
+      expect(errorSpy.mock.calls[3][1]).toMatch('executable');
     });
   });
 
@@ -111,12 +141,12 @@ describe('Process Descriptor', () => {
 
         // Tell our mock emitter to not actually emit the 'close' event,
         // simulating an attached debugger instance.
-        pd.killAfterGracePeriod(4000, 'FAIL_TO_CLOSE');
+        pd.kill('FAIL_TO_CLOSE');
 
         jest.advanceTimersByTime(2000);
-        expect(processHandle.kill).not.toHaveBeenCalled();
-        jest.advanceTimersByTime(2500);
         expect(processHandle.kill).toHaveBeenCalledTimes(1);
+        jest.advanceTimersByTime(2500);
+        expect(processHandle.kill).toHaveBeenCalledTimes(2);
         expect(processHandle.kill).toHaveBeenCalledWith('SIGKILL');
       });
     });
@@ -127,9 +157,12 @@ describe('Process Descriptor', () => {
 
         // Tell our mock emitter to not actually emit the 'close' event,
         // simulating an attached debugger instance.
-        pd.killAfterGracePeriod(4000, 'FAIL_TO_CLOSE');
-        jest.advanceTimersByTime(4100);
-        expect(processHandle.kill).toHaveBeenCalledTimes(1);
+        pd.kill('FAIL_TO_CLOSE');
+
+        jest.advanceTimersByTime(2000);
+        expect(processHandle.kill).toHaveBeenCalledTimes(2);
+        jest.advanceTimersByTime(2100);
+        expect(processHandle.kill).toHaveBeenCalledTimes(3);
         expect(processHandle.kill).toHaveBeenCalledWith('SIGKILL');
       });
     });
@@ -147,26 +180,6 @@ describe('Process Descriptor', () => {
     it('should send an interrupt signal and return a promise', async () => {
       await pd.kill();
       expect(processHandle.kill).toHaveBeenCalled();
-    });
-  });
-
-  describe('#killAfterGracePeriod', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    describe('when there is not a debugger attached', () => {
-      it('should wait the indicated time then kill the process', () => {
-        pd.killAfterGracePeriod(4000);
-        jest.advanceTimersByTime(2000);
-        expect(processHandle.kill).not.toHaveBeenCalled();
-        jest.advanceTimersByTime(2500);
-        expect(processHandle.kill).toHaveBeenCalledTimes(1);
-      });
     });
   });
 

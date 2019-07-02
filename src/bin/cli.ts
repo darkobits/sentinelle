@@ -3,7 +3,8 @@
 import adeiu from '@darkobits/adeiu';
 import yargs from 'yargs';
 
-import {Arguments} from 'etc/types';
+import {DEFAULT_KILL_SIGNAL} from 'etc/constants';
+import {SentinelleArguments} from 'etc/types';
 import SentinelleFactory from 'lib/sentinelle';
 import log from 'lib/log';
 import {getPackageVersion} from 'lib/utils';
@@ -12,7 +13,7 @@ import {getPackageVersion} from 'lib/utils';
 /**
  * Initializer for shutdown handlers.
  */
-const initAdeiu = (sent: ReturnType<typeof SentinelleFactory>) => adeiu(async signal => {
+const initAdeiu = (sentinelle: ReturnType<typeof SentinelleFactory>) => adeiu(async signal => {
   log.info('', log.chalk.bold(`Got signal ${signal}; shutting-down.`));
 
   // Register a second handler on the same signal we just received that
@@ -20,7 +21,7 @@ const initAdeiu = (sent: ReturnType<typeof SentinelleFactory>) => adeiu(async si
   // the grace period when the user issues a second SIGINT, for example,
   // we just kill the process immediately and exit.
   const secondaryHandler = async () => {
-    await sent.stop('SIGKILL');
+    await sentinelle.stop('SIGKILL');
 
     // Un-register this handler to prevent recursion.
     process.off(signal, secondaryHandler);
@@ -31,7 +32,7 @@ const initAdeiu = (sent: ReturnType<typeof SentinelleFactory>) => adeiu(async si
 
   process.prependListener(signal, secondaryHandler);
 
-  await sent.stop();
+  await sentinelle.stop();
 });
 
 
@@ -62,8 +63,9 @@ yargs.command({
     });
 
     command.option('kill', {
-      description: 'POSIX signal to send to the process when we need it to shut-down.',
+      description: 'POSIX signal to send to a process when we need it to shut-down.',
       type: 'string',
+      default: DEFAULT_KILL_SIGNAL,
       required: false
     });
 
@@ -79,7 +81,7 @@ yargs.command({
 
     return command;
   },
-  handler: async (args: Arguments) => {
+  handler: async (args: SentinelleArguments) => {
     try {
       const {entrypoint: entry, bin, watch, kill: processShutdownSignal, quiet} = args;
 
