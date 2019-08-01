@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.4](https://github.com/darkobits/sentinelle/compare/v0.6.3...v0.6.4) (2019-08-01)
+
+
+
 ### [0.6.3](https://github.com/darkobits/sentinelle/compare/v0.6.2...v0.6.3) (2019-07-02)
 
 
