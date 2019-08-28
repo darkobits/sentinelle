@@ -37,7 +37,7 @@
     "yargs": "^14.0.0"
   },
   "devDependencies": {
-    "@darkobits/dockerize": "^0.2.0",
+    "@darkobits/dockerize": "^0.2.1",
     "@darkobits/ts-unified": "^3.0.6",
     "@types/jest": "^24.0.18",
     "@types/ms": "^0.7.30",
