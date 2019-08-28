@@ -14,7 +14,7 @@ import {getPackageVersion} from 'lib/utils';
  * Initializer for shutdown handlers.
  */
 const initAdeiu = (sentinelle: ReturnType<typeof SentinelleFactory>) => adeiu(async signal => {
-  log.info('', log.chalk.bold(`Got signal ${signal}; shutting-down.`));
+  log.info(log.chalk.bold(`Got signal ${signal}; shutting-down.`));
 
   // Register a second handler on the same signal we just received that
   // will force-kill the process. This way, if a process is still within
@@ -86,7 +86,7 @@ yargs.command({
       const {entrypoint: entry, bin, watch, kill: processShutdownSignal, quiet} = args;
 
       if (quiet) {
-        log.level = 'warn';
+        log.configure({level: 'warn'});
       }
 
       // Create a Sentinelle instance.
@@ -95,17 +95,24 @@ yargs.command({
       // Setup signal handler.
       initAdeiu(sentinelle);
 
+      // Set up unhandled rejection handler. These can come from child process
+      // event emitters, even though we have proper error handlers set up on
+      // them.
+      process.on('unhandledRejection', err => {
+        log.verbose('Unhandled rejection:', err);
+      });
+
       // Log current version for debugging.
-      if (['verbose', 'silly'].includes(log.level)) {
+      if (log.isLevelAtLeast('verbose')) {
         const version = await getPackageVersion();
-        log.verbose('version', log.chalk.green.bold(version));
+        log.verbose(log.prefix('version'), log.chalk.green.bold(version));
       }
 
       // Start Sentinelle.
       await sentinelle.start();
     } catch (err) {
-      log.error('', err.message);
-      log.verbose('', err.stack.split('\n').slice(1).join('\n'));
+      log.error(err.message);
+      log.verbose(err.stack.split('\n').slice(1).join('\n'));
       process.exit(1);
     }
   }

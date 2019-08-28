@@ -120,7 +120,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
   function _setState(newState: ProcessState) {
     if (_state !== newState) {
       _state = newState;
-      log.silly('', `Set process state to ${log.chalk.bold(newState)}.`);
+      log.silly(`Set process state to ${log.chalk.bold(newState)}.`);
     }
   }
 
@@ -140,7 +140,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Handle the "error" event.
    */
-  function _handleError(err: Error & execa.ExecaError) {
+  function _handleError<E extends Error & execa.ExecaError & {code: string}>(err: E) {
     // Error messages from execa that we can safely ignore as they are reported
     // by us.
     const ignoreMessages = [
@@ -156,15 +156,15 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     }
 
     if (err && err.stack) {
-      log.error('', `Child process error: ${err.message}`);
-      log.verbose('', err.stack.split('\n').slice(1).join('\n'));
+      log.error(`Child process error: ${err.message}`);
+      log.verbose(err.stack.split('\n').slice(1).join('\n'));
     }
 
-    if (err.exitCodeName === 'ENOENT') {
+    if (err.exitCodeName === 'ENOENT' || err.code === 'ENOENT') {
       log.error('hint', log.chalk.bold('Did you remember to set a shebang in your entrypoint?'));
     }
 
-    if (err.exitCodeName === 'EACCES') {
+    if (err.exitCodeName === 'EACCES' || err.code === 'EACCES') {
       log.error('hint', log.chalk.bold('Did you remember to set the executable flag on your entrypoint?'));
     }
   }
@@ -182,12 +182,12 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
 
     if (/Debugger listening on/.test(data)) {
       _debuggerState = 'LISTENING';
-      log.verbose('', `Set debugger state to ${log.chalk.bold('LISTENING')}.`);
+      log.verbose(`Set debugger state to ${log.chalk.bold('LISTENING')}.`);
     }
 
     if (/Debugger attached/.test(data)) {
       _debuggerState = 'ATTACHED';
-      log.verbose('', `Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
+      log.verbose(`Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
     }
 
     // This scenario tends to arise when a process exits on its own (re: was not
@@ -218,14 +218,14 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
 
     if (_killReason === 'GRACE_PERIOD_EXPIRED') {
       // Process took longer than the grace period to shut-down.
-      log.error('', log.chalk.red.bold('Process failed to shut-down in time and was killed.'));
+      log.error(log.chalk.red.bold('Process failed to shut-down in time and was killed.'));
       _setState('KILLED');
       return;
     }
 
     if (signal === 'SIGKILL') {
       // Process closed as a result of SIGKILL.
-      log.error('', log.chalk.red.bold('Process was killed.'));
+      log.error(log.chalk.red.bold('Process was killed.'));
       _setState('KILLED');
       return;
     }
@@ -233,7 +233,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     if (_killReason === 'PAUSED_DEBUGGER') {
       // Process was killed because a file change triggered a restart while the
       // debugger had paused execution.
-      log.info('', log.chalk.red.dim.bold('Detected paused debugger; process was killed.'));
+      log.info(log.chalk.red.dim.bold('Detected paused debugger; process was killed.'));
       _setState('KILLED');
       return;
     }
@@ -241,7 +241,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     if (_killReason === 'HANGING_DEBUGGER') {
       // Process had a hanging debugger instnace attached and failed to
       // shut-down.
-      log.info('', log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
+      log.info(log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
       _setState('KILLED');
       return;
     }
@@ -253,14 +253,14 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and crashed within the grace
         // period.
-        log.error('', log.chalk.red.bold('Process crashed while shutting-down.'));
+        log.error(log.chalk.red.bold('Process crashed while shutting-down.'));
         _setState('STOPPED');
         return;
       }
 
       if (_state === 'STARTED') {
         // Process crashed on its own without requiring an interrupt signal.
-        log.error('', log.chalk.red.bold(`Process crashed. ${log.chalk.dim(`(Code: ${code})`)}`));
+        log.error(log.chalk.red.bold(`Process crashed. ${log.chalk.dim(`(Code: ${code})`)}`));
 
         _setState('EXITED');
         return;
@@ -274,7 +274,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       if (_state === 'STOPPING') {
         // Process was issued an interrupt signal and closed cleanly within the
         // grace period.
-        log.info('', log.chalk.bold('Process shut-down gracefully.'));
+        log.info(log.chalk.bold('Process shut-down gracefully.'));
         _setState('STOPPED');
         return;
       }
@@ -282,7 +282,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       if (_state === 'STARTED') {
         // Process exited cleanly on its own without requiring an interrupt
         // signal.
-        log.info('', log.chalk.bold('Process exited cleanly.'));
+        log.info(log.chalk.bold('Process exited cleanly.'));
         _setState('EXITED');
         return;
       }
@@ -367,15 +367,14 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
   // how signals are passed from us to it.
   _process = execa(bin, args, {stdio, detached: true});
 
+  // Prevents unhandled rejection warnings and lets us hook into process crash
+  // information that we don't get with the error handler above.
+  _process.catch(_handleError);
+
   // Set up event handlers.
   _process.on('message', _handleMessage);
   _process.on('close', _handleClose);
   _process.on('error', _handleError);
-  // console.warn('[ProcessDescriptor] I have attached _handleError to the "error" event of this object:', _process);
-
-  // Prevents unhandled rejection warnings and lets us hook into process crash
-  // information that we don't get with the error handler above.
-  _process.catch(_handleError);
 
   // Set up pipes as needed.
   if (_process.stdin) {
@@ -390,7 +389,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     _process.stderr.pipe(process.stderr);
     _process.stderr.on('data', _handleStderrData);
   } else if (bin.endsWith('node')) {
-    log.verbose('', 'With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
+    log.verbose('With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
   }
 
   _setState('STARTED');

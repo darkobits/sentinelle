@@ -26,27 +26,27 @@
   },
   "dependencies": {
     "@darkobits/adeiu": "^0.2.4",
-    "@darkobits/env": "^1.0.1",
-    "@darkobits/log": "^1.2.3",
+    "@darkobits/env": "^1.2.0",
+    "@darkobits/log": "^2.0.0-beta.8",
     "chokidar": "^3.0.2",
-    "execa": "^2.0.3",
+    "execa": "^2.0.4",
     "ms": "^2.1.2",
     "ow": "^0.13.2",
     "p-wait-for": "^3.1.0",
     "read-pkg-up": "^6.0.0",
-    "yargs": "^13.3.0"
+    "yargs": "^14.0.0"
   },
   "devDependencies": {
     "@darkobits/dockerize": "^0.2.0",
-    "@darkobits/ts-unified": "^3.0.3",
-    "@types/jest": "^24.0.16",
+    "@darkobits/ts-unified": "^3.0.6",
+    "@types/jest": "^24.0.18",
     "@types/ms": "^0.7.30",
-    "@types/node": "^12.6.8",
+    "@types/node": "^12.7.2",
     "@types/uuid": "^3.4.5",
     "@types/yargs": "^13.0.2",
     "bytes": "^3.1.0",
     "emittery": "^0.4.1",
     "is-ci": "^2.0.0",
-    "uuid": "^3.3.2"
+    "uuid": "^3.3.3"
   }
 }

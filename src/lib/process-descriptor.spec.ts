@@ -2,6 +2,11 @@ import EventEmitter from 'events';
 
 import log from 'lib/log';
 
+// Install `hasOwnProperty` on the logger; it doesn't inherit from
+// Object.prototype and Jest tries to use Object.prototype.hasOwnProperty on
+// this object in `spyOn`.
+log.hasOwnProperty = (key: string) => Reflect.has(log, key);
+
 
 // ----- Test Helpers ----------------------------------------------------------
 
@@ -95,8 +100,8 @@ describe('Process Descriptor', () => {
   });
 
   describe('handling errors', () => {
-    let warnSpy: jest.SpyInstance<void, [string, any, ...Array<any>]>;
-    let errorSpy: jest.SpyInstance<void, [string, any, ...Array<any>]>;
+    let warnSpy: jest.SpyInstance<void, Array<any>>;
+    let errorSpy: jest.SpyInstance<void, Array<any>>;
 
     beforeEach(() => {
       warnSpy = jest.spyOn(log, 'warn');
