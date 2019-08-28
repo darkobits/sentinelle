@@ -70,7 +70,7 @@ sentinelle --bin="node --inspect" ./server.js
 By default, Sentinelle always watches the directory containing the entrypoint file and any of its children. However, if you need to watch additional directories or files, you may use this argument.
 
 ```
-sentinelle --watch ./other-file.js --watch ./other-directory ./server.js
+sentinelle --watch ../other-file.js --watch ../other-directory ./server.js
 ```
 
 ### `--kill`
