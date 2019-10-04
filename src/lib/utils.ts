@@ -117,7 +117,7 @@ export async function getPackageVersion() {
   }
 
 
-  return pkgInfo.package.version;
+  return pkgInfo.packageJson.version;
 }
 
 

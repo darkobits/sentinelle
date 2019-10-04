@@ -236,7 +236,7 @@ describe('getPackageVersion', () => {
     jest.doMock('read-pkg-up', () => {
       return async () => {
         return {
-          package: {
+          packageJson: {
             version: VERSION
           }
         };
