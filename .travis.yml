@@ -1,0 +1,15 @@
+language: node_js
+node_js:
+  - 12
+script:
+  - npx nps build
+  - npx nps test.coverage
+after_success:
+  - npx codacy-coverage -v < ./coverage/lcov.info
+deploy:
+  provider: pages
+  local_dir: dist
+  skip_cleanup: true
+  github_token: $GITHUB_PAGES_DEPLOY_TOKEN
+  on:
+    branch: master
