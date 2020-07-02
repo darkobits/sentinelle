@@ -1,9 +1,0 @@
-{
-  "extends": "@darkobits/ts-unified/dist/config/tslint.json",
-  "rules": {
-    "no-http-string": false,
-    "prefer-conditional-expression": false,
-    "strict-type-predicates": false,
-    "no-redundant-jsdoc": false
-  }
-}

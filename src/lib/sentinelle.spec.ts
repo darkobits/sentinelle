@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import fs from 'fs';
 import Emittery from 'emittery';
-import uuid from 'uuid/v4';
+import {v4 as uuid} from 'uuid';
 import * as utils from 'lib/utils';
 
 
@@ -31,11 +32,11 @@ describe('Sentinelle', () => {
     chokidarWatchEmitter = new Emittery();
 
     // @ts-ignore
-    chokidarWatchEmitter.close = jest.fn((...args) => {
+    chokidarWatchEmitter.close = jest.fn(() => {
       // console.warn('[watcher.close] Called with:', args);
     });
 
-    chokidarWatchSpy = jest.fn((...args) => {
+    chokidarWatchSpy = jest.fn(() => {
       // console.warn('[chokidar] Got args:', args);
       return chokidarWatchEmitter;
     });
@@ -56,6 +57,7 @@ describe('Sentinelle', () => {
 
     const oStatSync = fs.statSync;
 
+    // @ts-expect-error
     statSyncSpy = jest.spyOn(fs, 'statSync').mockImplementation((arg: string) => {
       const isOurCall = [ENTRY_PATH, ENTRY, ...EXTRA_WATCHES].map(item => arg.includes(item)).includes(true);
 
@@ -96,7 +98,7 @@ describe('Sentinelle', () => {
       return processDescriptorSpy;
     });
 
-    const Sentinelle = require('./sentinelle'); // tslint:disable-line no-require-imports
+    const Sentinelle = require('./sentinelle');
 
     sent = Sentinelle({
       bin: BIN,
@@ -183,7 +185,7 @@ describe('Sentinelle', () => {
     });
 
     it('should close file watchers', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(chokidarWatchEmitter.close).toHaveBeenCalled();
     });
 

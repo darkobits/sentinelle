@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import adeiu from '@darkobits/adeiu';
-import yargs from 'yargs';
+import cli from '@darkobits/saffron';
 
 import {DEFAULT_KILL_SIGNAL} from 'etc/constants';
 import {SentinelleArguments} from 'etc/types';
@@ -24,12 +24,14 @@ const initAdeiu = (sentinelle: ReturnType<typeof SentinelleFactory>) => adeiu(as
     await sentinelle.stop('SIGKILL');
 
     // Un-register this handler to prevent recursion.
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     process.off(signal, secondaryHandler);
 
     // Kill the process with the same signal we received.
     process.kill(process.pid, signal);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   process.prependListener(signal, secondaryHandler);
 
   await sentinelle.stop();
@@ -38,9 +40,9 @@ const initAdeiu = (sentinelle: ReturnType<typeof SentinelleFactory>) => adeiu(as
 
 // ----- Command: Default ------------------------------------------------------
 
-yargs.command({
+cli.command<SentinelleArguments>({
   command: '* <entrypoint>',
-  builder: command => {
+  builder: ({command}) => {
     command.usage('Run a process, watch for file changes, and re-start the process.');
 
     command.positional('entrypoint', {
@@ -58,7 +60,7 @@ yargs.command({
     command.option('watch', {
       description: 'Directory to watch for file changes. Defaults to the directory of the entry file.',
       type: 'string',
-      coerce: arg => Array.isArray(arg) ? arg : [arg],
+      coerce: arg => (Array.isArray(arg) ? arg : [arg]),
       required: false
     });
 
@@ -81,9 +83,9 @@ yargs.command({
 
     return command;
   },
-  handler: async (args: SentinelleArguments) => {
+  handler: async ({argv}) => {
     try {
-      const {entrypoint: entry, bin, watch, kill: processShutdownSignal, quiet} = args;
+      const {entrypoint: entry, bin, watch, kill: processShutdownSignal, quiet} = argv;
 
       if (quiet) {
         log.configure({level: 'warn'});
@@ -119,14 +121,4 @@ yargs.command({
 });
 
 
-yargs.showHelpOnFail(true, 'See --help for usage instructions.');
-yargs.wrap(yargs.terminalWidth());
-yargs.alias('v', 'version');
-yargs.alias('h', 'help');
-yargs.version();
-yargs.strict();
-yargs.help();
-
-
-// Parse command-line arguments, bail on --help, --version, etc.
-export default yargs.argv;
+export default cli.init();

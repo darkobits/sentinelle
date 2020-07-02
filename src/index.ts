@@ -1,1 +1,1 @@
-export {default as default} from 'lib/sentinelle';
+export {default} from 'lib/sentinelle';

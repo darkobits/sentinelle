@@ -1,26 +1,23 @@
+/* eslint-disable unicorn/no-useless-undefined */
+/* eslint-disable @typescript-eslint/no-var-requires */
 import fs from 'fs';
 import os from 'os';
 import childProcess from 'child_process';
-import uuid from 'uuid/v4';
+import {v4 as uuid} from 'uuid';
 
-import {
-  isNumerical,
-  parseTime,
-  ensureArray,
-  randomArrayElement
-} from './utils';
+import * as utils from './utils';
 
 
 describe('isNumerical', () => {
   describe('when provided a string without digits', () => {
     it('should return `false`', () => {
-      expect(isNumerical('f2f394431')).toBe(false);
+      expect(utils.isNumerical('f2f394431')).toBe(false);
     });
   });
 
   describe('when provided a string with only digits', () => {
     it('should return `true`', () => {
-      expect(isNumerical('1613423')).toBe(true);
+      expect(utils.isNumerical('1613423')).toBe(true);
     });
   });
 });
@@ -29,26 +26,26 @@ describe('isNumerical', () => {
 describe('parseTime', () => {
   describe('when provided a number', () => {
     it('should return the number as-is', () => {
-      expect(parseTime(42)).toBe(42);
+      expect(utils.parseTime(42)).toBe(42);
     });
   });
 
   describe('when provided a numerical string', () => {
     it('should return a number', () => {
-      expect(parseTime('9000')).toBe(9000);
+      expect(utils.parseTime('9000')).toBe(9000);
     });
   });
 
   describe('when provided a parse-able string', () => {
     it('should return a number', () => {
-      expect(parseTime('5m')).toBe(300000);
+      expect(utils.parseTime('5m')).toBe(300000);
     });
   });
 
   describe('when provided an invalid string', () => {
     it('should return `undefined`', () => {
-      expect(parseTime('foo')).toBe(undefined);
-      expect(parseTime(undefined)).toBe(undefined);
+      expect(utils.parseTime('foo')).toBe(undefined);
+      expect(utils.parseTime()).toBe(undefined);
     });
   });
 });
@@ -57,13 +54,13 @@ describe('parseTime', () => {
 describe('ensureBin', () => {
   let osPlatformSpy: jest.SpyInstance<NodeJS.Platform, []>;
   let execSyncSpy: jest.SpyInstance<Buffer, [string, (childProcess.ExecSyncOptions | undefined)?]>;
-  let ensureBin: Function;
+  let ensureBin: typeof utils.ensureBin;
 
   beforeEach(() => {
     jest.resetAllMocks();
     osPlatformSpy = jest.spyOn(os, 'platform');
     execSyncSpy = jest.spyOn(childProcess, 'execSync');
-    ensureBin = require('./utils').ensureBin; // tslint:disable-line no-require-imports
+    ensureBin = require('./utils').ensureBin;
   });
 
   describe('on Windows platforms', () => {
@@ -148,7 +145,7 @@ describe('ensureBin', () => {
 
 describe('ensureFile', () => {
   let accessSyncSpy: jest.SpyInstance<void, [fs.PathLike, (number | undefined)?]>;
-  let ensureFile: Function;
+  let ensureFile: typeof utils.ensureFile;
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -212,14 +209,14 @@ describe('ensureArray', () => {
   describe('when provided an array', () => {
     it('should return the array as-is', () => {
       const arr = [uuid()];
-      expect(ensureArray(arr)).toBe(arr);
+      expect(utils.ensureArray(arr)).toBe(arr);
     });
   });
 
   describe('when provided a non-array', () => {
     it('should wrap the value in an array and return it', () => {
       const val = uuid();
-      expect(ensureArray(val)).toEqual([val]);
+      expect(utils.ensureArray(val)).toEqual([val]);
     });
   });
 });
@@ -228,7 +225,7 @@ describe('ensureArray', () => {
 describe('getPackageVersion', () => {
   const VERSION = uuid();
 
-  let getPackageVersion: Function;
+  let getPackageVersion: typeof utils.getPackageVersion;
 
   beforeEach(() => {
     jest.resetModuleRegistry();
@@ -259,6 +256,6 @@ describe('getPackageVersion', () => {
 describe('randomArrayElement', () => {
   it('should return a value contained in the provided array', () => {
     const arr = [uuid(), uuid(), uuid()];
-    expect(arr.includes(randomArrayElement(arr))).toBe(true);
+    expect(arr.includes(utils.randomArrayElement(arr))).toBe(true);
   });
 });

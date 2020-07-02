@@ -91,6 +91,9 @@ export interface Sentinelle {
  * exiting.
  */
 export default function SentinelleFactory(options: SentinelleOptions): Sentinelle {
+  const sentinelle: Partial<Sentinelle> = {};
+
+
   /**
    * @private
    *
@@ -132,7 +135,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * files or directories to watch with the "watch" option.
    */
   ow(options.watch, 'watch', ow.any(ow.array.ofType(ow.string), ow.undefined));
-  const _watches = [path.resolve(path.dirname(_entry)), ...(options.watch || [])];
+  const _watches = [path.resolve(path.dirname(_entry)), ...options.watch ?? []];
   log.silly(log.prefix('watches'), _watches);
 
 
@@ -141,12 +144,12 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    *
    * (Optional) How long to wait for a process to exit on its own after we issue
    * the configured shut-down signal. Once this period expires, the process will
-   * be forfully terminaled.
+   * be forcefully terminated.
    *
    * Default: '4 seconds'
    */
   ow(options.processShutdownGracePeriod, 'processShutdownGracePeriod', ow.any(ow.string, ow.number, ow.undefined));
-  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod || DEFAULT_SHUTDOWN_GRACE_PERIOD) as number;
+  const _processShutdownGracePeriod = parseTime(options.processShutdownGracePeriod ?? DEFAULT_SHUTDOWN_GRACE_PERIOD) as number;
   log.silly(log.prefix('gracePeriod'), `${_processShutdownGracePeriod}ms`);
 
 
@@ -159,7 +162,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * Default: SIGINT
    */
   ow(options.processShutdownSignal, 'processShutdownSignal', ow.any(ow.string, ow.undefined));
-  const _processShutdownSignal = options.processShutdownSignal || DEFAULT_KILL_SIGNAL;
+  const _processShutdownSignal = options.processShutdownSignal ?? DEFAULT_KILL_SIGNAL;
   log.silly(log.prefix('signal'), _processShutdownSignal);
 
 
@@ -169,7 +172,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * (Optional) Output options for spawned processes.
    */
   ow(options.stdio, 'stdio', ow.any(ow.undefined, ow.string, ow.array.ofType(ow.string)));
-  const _stdio = options.stdio || ['inherit', 'inherit', 'pipe'];
+  const _stdio = options.stdio ?? ['inherit', 'inherit', 'pipe'];
   log.silly(log.prefix('stdio'), _stdio);
 
 
@@ -196,13 +199,13 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    *
    * Initializes file watchers.
    */
-  function _initWatchers() {
+  const _initWatchers = () => {
     if (_watcher) {
       return;
     }
 
     // Ensure we aren't watching anything problematic.
-    const filteredWatches = _watches.reduce((finalWatches, curWatch) => {
+    const filteredWatches = _watches.reduce<Array<string>>((finalWatches, curWatch) => {
       if (curWatch === '/') {
         log.warn('Refusing to recursively watch "/"; watching entry file instead.');
         return [_entry, ...finalWatches];
@@ -224,11 +227,16 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
      * to be called numerous times, but will only call `startProcess` once, when
      * the last process has exited.
      */
-    _watcher.on('change', async file => {
+    _watcher.on('change', () => {
       // If there is no managed process running, start one.
       if (!_curProcess) {
         log.silly(log.prefix('change'), 'No process running; starting process.');
-        return startProcess();
+
+        if (typeof sentinelle.start === 'function') {
+          void sentinelle.start();
+        }
+
+        return;
       }
 
       // If the current process is in the... process... of shutting-down, bail.
@@ -237,7 +245,11 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
         return;
       }
 
-      return restartProcess();
+      if (typeof sentinelle.restart === 'function') {
+        void sentinelle.restart();
+      }
+
+      return;
     });
 
     /**
@@ -246,12 +258,12 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
      * TODO: Consider handling this.
      */
     _watcher.on('error', err => {
-      if (err && err.stack) {
+      if (err?.stack) {
         log.error('Watcher error:', err.message);
         log.verbose(err.stack.split('\n').slice(1).join('\n'));
       }
     });
-  }
+  };
 
 
   /**
@@ -259,7 +271,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    *
    * Sends a signal to the managed process and waits for it to become 'STOPPED'.
    */
-  async function _stopProcess(signal: NodeJS.Signals = _processShutdownSignal): Promise<void> {
+  const _stopProcess = async (signal: NodeJS.Signals = _processShutdownSignal): Promise<void> => {
     // Bail if there is no process to stop.
     if (!_curProcess) {
       log.warn('No process running.');
@@ -281,7 +293,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
     log.silly(`Sending signal ${log.chalk.yellow.bold(signal)} to process.`);
 
     await _curProcess.kill(signal);
-  }
+  };
 
 
   // ----- Public Methods ------------------------------------------------------
@@ -290,7 +302,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    * Waits for any current managed process to become 'STOPPED', then starts a
    * new managed process and returns its process descriptor.
    */
-  async function startProcess() {
+  sentinelle.start = async () => {
     // Start watchers. If this has already been done, this will be a no-op.
     _initWatchers();
 
@@ -324,6 +336,7 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
       log.info(log.chalk.bold('Starting'), log.chalk.green(commandAsString));
 
       // Create a new ProcessDescriptor.
+      // eslint-disable-next-line require-atomic-updates
       _curProcess = ProcessDescriptorFactory({
         bin: finalBin,
         args: finalArgs,
@@ -334,13 +347,13 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
       log.error(err.message);
       log.verbose(err.stack.split('\n').slice(1).join('\n'));
     }
-  }
+  };
 
 
   /**
    * Restarts the managed process.
    */
-  async function restartProcess(signal: NodeJS.Signals = _processShutdownSignal) {
+  sentinelle.restart = async (signal: NodeJS.Signals = _processShutdownSignal) => {
     // If no process has been started, bail.
     if (!_curProcess) {
       return;
@@ -351,15 +364,17 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
       await _stopProcess(signal);
     }
 
-    await startProcess();
-  }
+    if (typeof sentinelle.start === 'function') {
+      await sentinelle.start();
+    }
+  };
 
 
   /**
    * Closes all file watchers and waits for the current process to close. An
    * optional signal may be provided which will be sent to the process.
    */
-  async function stop(signal: NodeJS.Signals = _processShutdownSignal) {
+  sentinelle.stop = async (signal: NodeJS.Signals = _processShutdownSignal) => {
     if (!_curProcess) {
       return;
     }
@@ -368,7 +383,8 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
 
     // Close watchers.
     if (_watcher) {
-      _watcher.close();
+      await _watcher.close();
+      // eslint-disable-next-line require-atomic-updates
       _watcher = undefined;
       log.silly('My watch has ended.');
     }
@@ -376,12 +392,8 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
     // Close process.
     log.silly(`Stopping process with signal ${log.chalk.bold(signal)}.`);
     await _stopProcess(signal);
-  }
-
-
-  return {
-    start: startProcess,
-    restart: restartProcess,
-    stop
   };
+
+
+  return sentinelle as Required<Sentinelle>;
 }

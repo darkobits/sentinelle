@@ -34,7 +34,7 @@ export function parseTime(value?: string | number) {
 
   if (typeof value === 'string') {
     if (isNumerical(value)) {
-      return parseInt(value, 10);
+      return Number.parseInt(value, 10);
     }
 
     // The type definitions for `ms` do not indicate that it returns `undefined`
@@ -56,7 +56,7 @@ export function ensureBin(name: string) {
   try {
     return execSync(`${binFinder} ${name}`, {encoding: 'utf8'}).trim();
   } catch (err) {
-    if (err && err.message && err.message.toLowerCase().includes('command failed')) {
+    if (err?.message && err.message.toLowerCase().includes('command failed')) {
       throw new Error(`The binary "${name}" was not found on your system.`);
     }
 

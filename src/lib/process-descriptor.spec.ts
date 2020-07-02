@@ -1,4 +1,4 @@
-import EventEmitter from 'events';
+import {EventEmitter} from 'events';
 
 import log from 'lib/log';
 
@@ -6,6 +6,25 @@ import log from 'lib/log';
 // Object.prototype and Jest tries to use Object.prototype.hasOwnProperty on
 // this object in `spyOn`.
 log.hasOwnProperty = (key: string) => Reflect.has(log, key);
+
+
+// ----- Mocks -----------------------------------------------------------------
+
+jest.mock('fs', () => {
+  return {
+    readFileSync: (filePath: string) => {
+      if (!filePath) {
+        throw new Error('[fs::readFileSync Mock] No path provided.');
+      }
+
+      if (filePath.includes('good')) {
+        return '#!/usr/bin/env node';
+      }
+
+      return 'bad executable file';
+    }
+  };
+});
 
 
 // ----- Test Helpers ----------------------------------------------------------
@@ -58,14 +77,15 @@ describe('Process Descriptor', () => {
     const emitter = new EventEmitter();
     processHandle = createMockProcessHandle(emitter);
 
-    execaSpy = jest.fn((...args) => {
+    execaSpy = jest.fn(() => {
       // console.warn('[spawn] Called with:', args);
       return processHandle;
     });
 
     jest.doMock('execa', () => execaSpy);
 
-    const ProcessDescriptor = require('./process-descriptor'); // tslint:disable-line no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ProcessDescriptor = require('./process-descriptor');
     pd = ProcessDescriptor({bin: BIN, args: ARGS, stdio: STDIO});
   });
 
@@ -116,18 +136,24 @@ describe('Process Descriptor', () => {
       expect(errorSpy).not.toHaveBeenCalled();
     });
 
-    it('should issue hints on appropriate errors', () => {
-      const enoentErr = new Error('ENOENT');
+    it('should issue hints on appropriate errors', async () => {
+      const noShebangErr = new Error('no shebang');
       // @ts-ignore
-      enoentErr.exitCodeName = 'ENOENT';
-      processHandle.emit('error', enoentErr);
-      expect(errorSpy.mock.calls[1][1]).toMatch('shebang');
+      noShebangErr.exitCode = 2;
+      // @ts-ignore
+      noShebangErr.failed = true;
+      // @ts-ignore
+      noShebangErr.command = 'bad-file.js';
 
-      const eaccesErr = new Error('EACCES');
+      processHandle.emit('error', noShebangErr);
+      expect(errorSpy.mock.calls[0][1]).toMatch('shebang');
+
+      const noExecPermissionErr = new Error('no exec flag');
       // @ts-ignore
-      eaccesErr.exitCodeName = 'EACCES';
-      processHandle.emit('error', eaccesErr);
-      expect(errorSpy.mock.calls[3][1]).toMatch('executable');
+      noExecPermissionErr.code = 'EACCES';
+
+      processHandle.emit('error', noExecPermissionErr);
+      expect(errorSpy.mock.calls[2][1]).toMatch('executable');
     });
   });
 
