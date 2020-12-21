@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.7](https://github.com/darkobits/sentinelle/compare/v0.6.6...v0.6.7) (2020-12-21)
+
+
+### 🏗 Chores
+
+* Add .travis.yml. ([33a28ed](https://github.com/darkobits/sentinelle/commit/33a28ede03b96daebbcf39b6f324347327fc0e3c))
+* Update ci.yml. ([b39df80](https://github.com/darkobits/sentinelle/commit/b39df80cf09649b707e8218be2d9d164e32274a0))
+* Update dependencies. ([cdd717b](https://github.com/darkobits/sentinelle/commit/cdd717b346302561bb99cb55f6e7d1bcac413188))
+* Update dependencies. ([7ac64a4](https://github.com/darkobits/sentinelle/commit/7ac64a430269c0d7f12af6751d2c7adc2bec998b))
+
 ### [0.6.6](https://github.com/darkobits/sentinelle/compare/v0.6.5...v0.6.6) (2019-10-04)
 
 ### [0.6.5](https://github.com/darkobits/sentinelle/compare/v0.6.4...v0.6.5) (2019-08-29)
