@@ -1,12 +1,12 @@
 <a href="#top" id="top">
-  <a href="https://www.linguee.com/english-french/search?source=auto&query=sentinelle"><img src="https://user-images.githubusercontent.com/441546/56262918-a7049600-6095-11e9-942c-d5934e79bf50.png" style="max-width: 100%;"></a>
+  <a href="https://www.linguee.com/english-french/search?source=auto&query=sentinelle"><img src="https://user-images.githubusercontent.com/441546/103064053-dc9a9b80-4567-11eb-8b5c-a7223865acc9.png" style="max-width: 100%;"></a>
 </a>
 <p align="center">
   <a href="https://www.npmjs.com/package/@darkobits/sentinelle"><img src="https://img.shields.io/npm/v/@darkobits/sentinelle.svg?style=flat-square"></a>
   <a href="https://github.com/darkobits/sentinelle/actions?query=workflow%3ACI"><img src="https://img.shields.io/github/workflow/status/darkobits/sentinelle/CI/master?style=flat-square"></a>
-  <a href="https://www.codacy.com/app/darkobits/sentinelle"><img src="https://img.shields.io/codacy/coverage/cb56e2c8b1f744728f4d39ccca0ff4d1.svg?style=flat-square"></a>
+  <a href="https://app.codecov.io/gh/darkobits/sentinelle/branch/master"><img src="https://img.shields.io/codecov/c/github/darkobits/sentinelle/master?style=flat-square"></a>
   <a href="https://david-dm.org/darkobits/sentinelle"><img src="https://img.shields.io/david/darkobits/sentinelle.svg?style=flat-square"></a>
-  <a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/conventional%20commits-1.0.0-FB5E85.svg?style=flat-square"></a>
+  <a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/conventional%20commits-1.0.0-027dc6.svg?style=flat-square"></a>
 </p>
 
 A development tool, primarily designed for JavaScript projects, that can be used to watch a set of files and restart a process when they change.
@@ -209,8 +209,7 @@ Sentinelle respects the `LOG_LEVEL` environment variable, which may be set to an
 LOG_LEVEL=silly sentinelle ./server.js
 ```
 
-## &nbsp;
-<p align="center">
-  <br>
-  <img width="22" height="22" src="https://cloud.githubusercontent.com/assets/441546/25318539/db2f4cf2-2845-11e7-8e10-ef97d91cd538.png">
-</p>
+<br />
+<a href="#top">
+  <img src="https://user-images.githubusercontent.com/441546/102322726-5e6d4200-3f34-11eb-89f2-c31624ab7488.png" style="max-width: 100%;">
+</a>
