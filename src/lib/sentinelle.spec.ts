@@ -153,7 +153,7 @@ describe('Sentinelle', () => {
 
     describe('when the "bin" option is not used', () => {
       beforeEach(async () => {
-        const Sentinelle = require('./sentinelle'); // tslint:disable-line no-require-imports
+        const Sentinelle = require('./sentinelle');
 
         sent = Sentinelle({
           entry: ENTRY,

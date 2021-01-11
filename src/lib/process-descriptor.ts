@@ -319,7 +319,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       // process to force it to exit.
       if (processDescriptor.isClosed && processDescriptor.kill && !processDescriptor.isClosed() && _debuggerState === 'ATTACHED') {
         _killReason = 'PAUSED_DEBUGGER';
-        void processDescriptor.kill('SIGKILL'); // tslint:disable-line no-floating-promises
+        void processDescriptor.kill('SIGKILL');
         return;
       }
 
@@ -327,7 +327,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       if (processDescriptor.isClosed && processDescriptor.kill && !processDescriptor.isClosed()) {
         // Set killReason so `handleClose` knows what happened.
         _killReason = 'GRACE_PERIOD_EXPIRED';
-        void processDescriptor.kill(signal); // tslint:disable-line no-floating-promises
+        void processDescriptor.kill(signal);
         return;
       }
     }, _shutdownGracePeriod);
@@ -369,7 +369,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    */
   processDescriptor.kill = async (signal?: NodeJS.Signals) => {
     _setState('STOPPING');
-    _process.kill(signal); // tslint:disable-line no-use-before-declare
+    _process.kill(signal);
     _killAfterGracePeriod('SIGKILL');
 
     if (processDescriptor.awaitClosed) {

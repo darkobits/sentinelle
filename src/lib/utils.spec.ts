@@ -150,7 +150,7 @@ describe('ensureFile', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     accessSyncSpy = jest.spyOn(fs, 'accessSync');
-    ensureFile = require('./utils').ensureFile; // tslint:disable-line no-require-imports
+    ensureFile = require('./utils').ensureFile;
   });
 
   describe('when the file exists and is readable', () => {
@@ -240,7 +240,7 @@ describe('getPackageVersion', () => {
       };
     });
 
-    getPackageVersion = require('./utils').getPackageVersion; // tslint:disable-line no-require-imports
+    getPackageVersion = require('./utils').getPackageVersion;
   });
 
   afterEach(() => {
