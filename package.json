@@ -29,7 +29,7 @@
     "@darkobits/env": "^1.3.2",
     "@darkobits/log": "^2.0.0-beta.14",
     "@darkobits/saffron": "^0.1.12",
-    "chokidar": "^3.5.0",
+    "chokidar": "^3.5.1",
     "execa": "^5.0.0",
     "ms": "^2.1.2",
     "ow": "^0.21.0",
