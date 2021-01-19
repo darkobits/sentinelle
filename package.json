@@ -2,7 +2,7 @@
   "name": "@darkobits/sentinelle",
   "version": "0.6.7",
   "description": "File watcher / process manager.",
-  "license": "WTFPL",
+  "license": "CC BY-NC-SA 4.0",
   "author": "darkobits",
   "repository": {
     "type": "git",
