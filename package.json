@@ -36,9 +36,9 @@
   "devDependencies": {
     "@darkobits/dockerize": "^0.2.10",
     "@darkobits/ts": "^0.2.2",
-    "@types/jest": "^26.0.20",
+    "@types/jest": "^26.0.23",
     "@types/ms": "^0.7.30",
-    "@types/node": "^14.14.21",
+    "@types/node": "^14.14.44",
     "@types/uuid": "^8.0.0",
     "bytes": "^3.1.0",
     "emittery": "^0.8.1",
