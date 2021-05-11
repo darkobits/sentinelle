@@ -21,7 +21,7 @@ describe('Sentinelle', () => {
 
   let chokidarWatchEmitter: Emittery;
   let chokidarWatchSpy: jest.Mock<Emittery, Array<any>>;
-  let setTimeoutSpy: jest.SpyInstance<NodeJS.Timeout, [(...args: Array<any>) => void, number, ...Array<any>]>;
+  let setTimeoutSpy: jest.SpyInstance<NodeJS.Timeout, [callback: (...args: Array<any>) => void, ms?: number | undefined, ...args: Array<any>]>;
   let statSyncSpy: jest.SpyInstance<fs.Stats, [fs.PathLike]>;
   let processDescriptorSpy: any;
 
