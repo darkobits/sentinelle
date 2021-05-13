@@ -99,8 +99,6 @@ export default function SentinelleFactory(options: SentinelleOptions): Sentinell
    *
    * (Optional) Name of the binary we will use to execute our entry file. This
    * will throw if the binary is not present.
-   *
-   * Default: node
    */
   ow(options.bin, 'bin', ow.any(ow.string, ow.undefined));
   const _bin = options.bin;

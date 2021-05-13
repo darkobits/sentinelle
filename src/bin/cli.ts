@@ -3,11 +3,11 @@
 import adeiu from '@darkobits/adeiu';
 import cli from '@darkobits/saffron';
 
-import {DEFAULT_KILL_SIGNAL} from 'etc/constants';
-import {SentinelleArguments} from 'etc/types';
+import { DEFAULT_KILL_SIGNAL } from 'etc/constants';
+import { SentinelleArguments } from 'etc/types';
 import SentinelleFactory from 'lib/sentinelle';
 import log from 'lib/log';
-import {getPackageVersion} from 'lib/utils';
+import { getPackageVersion } from 'lib/utils';
 
 
 /**
@@ -60,7 +60,7 @@ cli.command<SentinelleArguments>({
     command.option('watch', {
       description: 'Directory to watch for file changes. Defaults to the directory of the entry file.',
       type: 'string',
-      coerce: arg => (Array.isArray(arg) ? arg : [arg]),
+      coerce: arg => (arg ? Array.isArray(arg) ? arg : [arg] : []),
       required: false
     });
 
