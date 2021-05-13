@@ -29,19 +29,19 @@
     "chokidar": "^3.5.1",
     "execa": "^5.0.0",
     "ms": "^2.1.2",
-    "ow": "^0.22.0",
+    "ow": "^0.23.0",
     "p-wait-for": "^3.2.0",
     "read-pkg-up": "^7.0.0"
   },
   "devDependencies": {
-    "@darkobits/dockerize": "^0.2.10",
-    "@darkobits/ts": "^0.3.1",
+    "@darkobits/dockerize": "^1.0.0",
+    "@darkobits/ts": "^0.3.3",
     "@types/ms": "^0.7.30",
     "@types/uuid": "^8.0.0",
     "bytes": "^3.1.0",
     "emittery": "^0.8.1",
     "gh-pages": "^3.1.0",
-    "is-ci": "^2.0.0",
+    "is-ci": "^3.0.0",
     "uuid": "^8.2.0"
   }
 }
