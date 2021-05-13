@@ -3,7 +3,7 @@
 </a>
 <p align="center">
   <a href="https://www.npmjs.com/package/@darkobits/sentinelle"><img src="https://img.shields.io/npm/v/@darkobits/sentinelle.svg?style=flat-square&color=398AFB"></a>
-  <a href="https://github.com/darkobits/sentinelle/actions"><img src="https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fdarkobits%2Fsentinelle%2Fbadge%3Fref%3Dmaster&style=flat-square&label=build&logo=none"></a>
+  <a href="https://github.com/darkobits/sentinelle/actions"><img src="https://img.shields.io/github/workflow/status/darkobits/sentinelle/CI?style=flat-square"></a>
   <a href="https://app.codecov.io/gh/darkobits/sentinelle/branch/master"><img src="https://img.shields.io/codecov/c/github/darkobits/sentinelle/master?style=flat-square&color=brightgreen"></a>
   <img src="https://img.shields.io/depfu/darkobits/sentinelle?style=flat-square">
   <a href="https://conventionalcommits.org"><img src="https://img.shields.io/static/v1?label=commits&message=conventional&style=flat-square&color=3073BF"></a>
