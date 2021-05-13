@@ -152,43 +152,6 @@ Restarts the process. By default, the configured `processShutdownSignal` is sent
 Stops the current process if one is running and closes all file watchers. By default, the configured `processShutdownSignal` is sent to the process. However, this may be overridden by providing an optional `signal` argument to this function. Returns a Promise that resolves when this operation is complete.
 
 
-## Docker Image
-
-Many modern development workflows involve the use of Docker to achieve a more production-like environment. For convenience, Sentinelle is also distributed as a Docker image. This section will walk you through how to download and use it. Working knowledge of Docker and a Docker installation on your machine are assumed.
-
-The Sentinelle Docker image uses Node 10.14.1, and is based on the [`ubuntu:19.04`](https://hub.docker.com/_/ubuntu) image.
-
-### Pull
-
-To pull the latest available version:
-
-`docker pull darkobits/sentinelle:latest`
-
-However, using `latest` is Considered Harmful, as it will not protect you against future breaking changes. Therefore, you should select a specific version to use instead. Every [Git tag in this repository](https://github.com/darkobits/sentinelle/releases) has a [corresponding Docker image tag](https://hub.docker.com/r/darkobits/sentinelle/tags):
-
-`docker pull darkobits/sentinelle:v0.5.0`
-
-### Run
-
-When running the image, everything after the `<image name>` positional argument will be treated as Sentinelle arguments, which are parsed just like the CLI. Remember that environment variables need to be set with the `-e` argument and you will need to volume-mount the directory containing your entrypoint and the files you want to watch.
-
-For completeness, here is a command illustrating setting an environment variable, passing arguments to Docker, to Sentinelle, to the entrypoint, and to Node:
-
-```shell
-docker run \
-  --rm \
-  --tty \
-  --interactive \
-  -e LOG_LEVEL=silly \
-  --volume $(pwd)/src:/app/src \
-  --volume $(pwd)/node_modules:/app/node_modules \
-  darkobits/sentinelle:0.6.3 --bin="node --inspect" "/app/src/server.js --port=80"
-```
-
-This assumes we are in our project's root directory, that our source files are in `src`, and our entrypoint is `src/server.js`.
-
-If the project requires transpilation using a tool like Babel, you would instead want to mount the project's `dist` (or equivalent) folder and use `dist/server.js` as your entrypoint while running Babel in watch mode in another terminal. This will allow you to change source files locally and have Sentinelle restart the application in the Docker container whenever Babel re-transpiles them.
-
 ## Node Debugger & I/O Configuration
 
 The Node debugger can make Sentinelle's job harder than it otherwise would be. Nevertheless, debugging is a critical part of development, so Sentinelle tries to work around some of these quirks as best it can.

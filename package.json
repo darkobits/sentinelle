@@ -34,7 +34,6 @@
     "read-pkg-up": "^7.0.0"
   },
   "devDependencies": {
-    "@darkobits/dockerize": "^1.0.0",
     "@darkobits/ts": "^0.3.3",
     "@types/ms": "^0.7.30",
     "@types/uuid": "^8.0.0",
