@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.8](https://github.com/darkobits/sentinelle/compare/v0.6.7...v0.6.8) (2021-05-13)
+
+
+### 📖 Documentation
+
+* Update README. ([2d2ee96](https://github.com/darkobits/sentinelle/commit/2d2ee967cfa4d7b734cdc459c0c653e26dc94068))
+* Update README. ([d79ffde](https://github.com/darkobits/sentinelle/commit/d79ffde6941ec077e2b789c6d6eee5a7dbb79194))
+* Update README. ([39614cc](https://github.com/darkobits/sentinelle/commit/39614ccbf3fdfbeefff06e715381817e2fa495c6))
+* Update README. ([ea58fa1](https://github.com/darkobits/sentinelle/commit/ea58fa10314497006c6d73cad16e024e6e49fac2))
+
+
+### 🏗 Chores
+
+* **deps:** bump handlebars from 4.7.6 to 4.7.7 ([#135](https://github.com/darkobits/sentinelle/issues/135)) ([3181adf](https://github.com/darkobits/sentinelle/commit/3181adf17d07637f426c58075ac9239f5a2b9129))
+* **deps:** bump hosted-git-info from 2.8.8 to 2.8.9 ([#137](https://github.com/darkobits/sentinelle/issues/137)) ([1a8ce30](https://github.com/darkobits/sentinelle/commit/1a8ce309b248836390280806da3dcef1d314b7e4))
+* **deps:** bump lodash from 4.17.20 to 4.17.21 ([#136](https://github.com/darkobits/sentinelle/issues/136)) ([2c71c1b](https://github.com/darkobits/sentinelle/commit/2c71c1bdf98bdc97ba62dd9e26f1b075a32bb8aa))
+* **deps:** Update dependencies. ([bf60e28](https://github.com/darkobits/sentinelle/commit/bf60e28f90d2f41a7fbded1b9c2957c42e2485c3))
+* **deps:** Update dependencies. ([ba4e0fd](https://github.com/darkobits/sentinelle/commit/ba4e0fd13fff24bf24f0c36623d4f0e96a95f657))
+* Update dependencies. ([673acf1](https://github.com/darkobits/sentinelle/commit/673acf1fa140e63dfa1f23acc136676cdc8cfde9))
+* Update GitHub Actions configuration. ([dfb420c](https://github.com/darkobits/sentinelle/commit/dfb420c8cb5dfb07c4c040479118817622c32705))
+* Update TS config. ([c957ade](https://github.com/darkobits/sentinelle/commit/c957ade62cd319488c7d917a9d05f628f5634a98))
+
 ### [0.6.7](https://github.com/darkobits/sentinelle/compare/v0.6.6...v0.6.7) (2020-12-21)
 
 
