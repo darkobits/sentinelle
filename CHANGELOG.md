@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.9](https://github.com/darkobits/sentinelle/compare/v0.6.8...v0.6.9) (2021-06-05)
+
+
+### 🏗 Chores
+
+* Remove Docker image references. ([dbc7875](https://github.com/darkobits/sentinelle/commit/dbc787545c3e06a5c0dba8319b213c719b5daa50))
+
+
+### 📖 Documentation
+
+* Update README. ([c01d371](https://github.com/darkobits/sentinelle/commit/c01d37158fc904f8730e5d909cdfd898581c8df7))
+
 ### [0.6.8](https://github.com/darkobits/sentinelle/compare/v0.6.7...v0.6.8) (2021-05-13)
 
 
