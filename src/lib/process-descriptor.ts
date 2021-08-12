@@ -71,7 +71,7 @@ export interface ProcessDescriptor {
  * Returns a new process descriptor representing a managed process and its
  * state.
  */
-export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGracePeriod}: ProcessDescriptorOptions): ProcessDescriptor {
+export default function ProcessDescriptorFactory(opts: ProcessDescriptorOptions): ProcessDescriptor {
   const processDescriptor: Partial<ProcessDescriptor> = {};
 
 
@@ -81,7 +81,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * Child process/promise returned by Execa.
    */
   // eslint-disable-next-line prefer-const
-  let _process: execa.ExecaChildProcess;
+  let childProcess: execa.ExecaChildProcess;
 
 
   /**
@@ -89,7 +89,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * The managed process' current state.
    */
-  let _state: ProcessState;
+  let state: ProcessState;
 
 
   /**
@@ -98,7 +98,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * Tracks the state of Node debugger instances that may be attached to the
    * process.
    */
-  let _debuggerState: DebuggerState = 'DISABLED';
+  let debuggerState: DebuggerState = 'DISABLED';
 
 
   /**
@@ -106,7 +106,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Potential reason for why the process might have been forcefully killed.
    */
-  let _killReason: KillReason;
+  let killReason: KillReason;
 
 
   /**
@@ -114,7 +114,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Number of milliseconds to wait before forcefully killing a process.
    */
-  const _shutdownGracePeriod = shutdownGracePeriod || 4000;
+  const shutdownGracePeriod = opts.shutdownGracePeriod ?? 4000;
 
 
   // ----- Private Methods -----------------------------------------------------
@@ -124,9 +124,9 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Sets the process' current state.
    */
-  const _setState = (newState: ProcessState) => {
-    if (_state !== newState) {
-      _state = newState;
+  const setState = (newState: ProcessState) => {
+    if (state !== newState) {
+      state = newState;
       log.silly(`Set process state to ${log.chalk.bold(newState)}.`);
     }
   };
@@ -137,7 +137,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Handle the "message" event.
    */
-  const _handleMessage = (message: any) => {
+  const handleMessage = (message: any) => {
     log.silly('process', message);
   };
 
@@ -147,7 +147,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Handle the "error" event.
    */
-  const _handleError = <E extends Error & execa.ExecaError & {code: string}>(err: E) => {
+  const handleError = <E extends Error & execa.ExecaError & {code: string}>(err: E) => {
     if (err.exitCode === 2 && err.failed) {
       const firstLine = fs.readFileSync(err.command, {encoding: 'utf8'}).split(os.EOL)[0];
 
@@ -189,16 +189,16 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * for stderr's `data` event. This allows us to track the state of Node
    * debuggers.
    */
-  const _handleStderrData = (chunk: any) => {
+  const handleStderrData = (chunk: any) => {
     const data = Buffer.from(chunk).toString('utf8');
 
     if (data.includes('Debugger listening on')) {
-      _debuggerState = 'LISTENING';
+      debuggerState = 'LISTENING';
       log.verbose(`Set debugger state to ${log.chalk.bold('LISTENING')}.`);
     }
 
     if (data.includes('Debugger attached')) {
-      _debuggerState = 'ATTACHED';
+      debuggerState = 'ATTACHED';
       log.verbose(`Set debugger state to ${log.chalk.bold('ATTACHED')}.`);
     }
 
@@ -208,8 +208,8 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     // below message. When we see this message, we know we can safely kill the
     // process immediately.
     if (/waiting for the debugger to disconnect/gi.test(data)) {
-      _debuggerState = 'HANGING';
-      _killReason = 'HANGING_DEBUGGER';
+      debuggerState = 'HANGING';
+      killReason = 'HANGING_DEBUGGER';
       // Rather than waiting for the grace period to expire, we should kill
       // the process immediately. We can safely assume that the process has
       // exited (as far as the user's code is concerned) because Node only
@@ -227,36 +227,36 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Handle the (very complex) "close" event.
    */
-  const _handleClose = (code: number, signal: string) => {
+  const handleClose = (code: number, signal: string) => {
     // ----- Exotic Ungraceful Exits -------------------------------------------
 
-    if (_killReason === 'GRACE_PERIOD_EXPIRED') {
+    if (killReason === 'GRACE_PERIOD_EXPIRED') {
       // Process took longer than the grace period to shut-down.
       log.error(log.chalk.red.bold('Process failed to shut-down in time and was killed.'));
-      _setState('KILLED');
+      setState('KILLED');
       return;
     }
 
     if (signal === 'SIGKILL') {
       // Process closed as a result of SIGKILL.
       log.error(log.chalk.red.bold('Process was killed.'));
-      _setState('KILLED');
+      setState('KILLED');
       return;
     }
 
-    if (_killReason === 'PAUSED_DEBUGGER') {
+    if (killReason === 'PAUSED_DEBUGGER') {
       // Process was killed because a file change triggered a restart while the
       // debugger had paused execution.
       log.info(log.chalk.red.dim.bold('Detected paused debugger; process was killed.'));
-      _setState('KILLED');
+      setState('KILLED');
       return;
     }
 
-    if (_killReason === 'HANGING_DEBUGGER') {
+    if (killReason === 'HANGING_DEBUGGER') {
       // Process had a hanging debugger instnace attached and failed to
       // shut-down.
       log.info(log.chalk.red.dim.bold('Detected hanging debugger; process was killed.'));
-      _setState('KILLED');
+      setState('KILLED');
       return;
     }
 
@@ -264,19 +264,19 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     // ----- Ungraceful Exits --------------------------------------------------
 
     if (code !== 0 && signal === null) {
-      if (_state === 'STOPPING') {
+      if (state === 'STOPPING') {
         // Process was issued an interrupt signal and crashed within the grace
         // period.
         log.error(log.chalk.red.bold('Process crashed while shutting-down.'));
-        _setState('STOPPED');
+        setState('STOPPED');
         return;
       }
 
-      if (_state === 'STARTED') {
+      if (state === 'STARTED') {
         // Process crashed on its own without requiring an interrupt signal.
         log.error(log.chalk.red.bold(`Process crashed. ${log.chalk.dim(`(Code: ${code})`)}`));
 
-        _setState('EXITED');
+        setState('EXITED');
         return;
       }
     }
@@ -285,24 +285,24 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
     // ----- Graceful Exits ----------------------------------------------------
 
     if (code === 0 || code === null) {
-      if (_state === 'STOPPING') {
+      if (state === 'STOPPING') {
         // Process was issued an interrupt signal and closed cleanly within the
         // grace period.
         log.info(log.chalk.bold('Process shut-down gracefully.'));
-        _setState('STOPPED');
+        setState('STOPPED');
         return;
       }
 
-      if (_state === 'STARTED') {
+      if (state === 'STARTED') {
         // Process exited cleanly on its own without requiring an interrupt
         // signal.
         log.info(log.chalk.bold('Process exited cleanly.'));
-        _setState('EXITED');
+        setState('EXITED');
         return;
       }
     }
 
-    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}; State: ${_state}`);
+    throw new Error(`Unexpected code path in "close" handler. Exit code: ${code}; signal: ${signal}; State: ${state}`);
   };
 
 
@@ -311,14 +311,14 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    *
    * Kills the process after the indicated grace period.
    */
-  const _killAfterGracePeriod = (signal: NodeJS.Signals) => {
+  const killAfterGracePeriod = (signal: NodeJS.Signals) => {
     setTimeout(() => {
       // Process has not exited after the grace period and a Node debugger is
       // attached. It is likely that the process did not exit because the
       // debugger is paused. In this case, we need to send a SIGKILL to the
       // process to force it to exit.
-      if (processDescriptor.isClosed && processDescriptor.kill && !processDescriptor.isClosed() && _debuggerState === 'ATTACHED') {
-        _killReason = 'PAUSED_DEBUGGER';
+      if (processDescriptor.isClosed && processDescriptor.kill && !processDescriptor.isClosed() && debuggerState === 'ATTACHED') {
+        killReason = 'PAUSED_DEBUGGER';
         void processDescriptor.kill('SIGKILL');
         return;
       }
@@ -326,11 +326,11 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
       // Process has not exited after the grace period
       if (processDescriptor.isClosed && processDescriptor.kill && !processDescriptor.isClosed()) {
         // Set killReason so `handleClose` knows what happened.
-        _killReason = 'GRACE_PERIOD_EXPIRED';
+        killReason = 'GRACE_PERIOD_EXPIRED';
         void processDescriptor.kill(signal);
         return;
       }
-    }, _shutdownGracePeriod);
+    }, shutdownGracePeriod);
   };
 
 
@@ -340,7 +340,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * Returns the process' state.
    */
   processDescriptor.getState = () => {
-    return _state;
+    return state;
   };
 
 
@@ -348,7 +348,7 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * Returns true if the process' state is STOPPED, KILLED, or EXITED.
    */
   processDescriptor.isClosed = () => {
-    return ['STOPPED', 'EXITED', 'KILLED'].includes(_state);
+    return ['STOPPED', 'EXITED', 'KILLED'].includes(state);
   };
 
 
@@ -368,9 +368,9 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
    * promise that resolves when the process has exited.
    */
   processDescriptor.kill = async (signal?: NodeJS.Signals) => {
-    _setState('STOPPING');
-    _process.kill(signal);
-    _killAfterGracePeriod('SIGKILL');
+    setState('STOPPING');
+    childProcess.kill(signal);
+    killAfterGracePeriod('SIGKILL');
 
     if (processDescriptor.awaitClosed) {
       return processDescriptor.awaitClosed();
@@ -380,38 +380,38 @@ export default function ProcessDescriptorFactory({bin, args, stdio, shutdownGrac
 
   // ----- Init ----------------------------------------------------------------
 
-  _setState('STARTING');
+  setState('STARTING');
 
   // Run the child process in detached mode, as this gives us more control over
   // how signals are passed from us to it.
-  _process = execa(bin, args, {stdio, detached: true});
+  childProcess = execa(opts.bin, opts.args, { stdio: opts.stdio, detached: true });
 
   // Prevents unhandled rejection warnings and lets us hook into process crash
   // information that we don't get with the error handler above.
-  _process.catch(_handleError);
+  childProcess.catch(handleError);
 
   // Set up event handlers.
-  void _process.on('message', _handleMessage);
-  void _process.on('close', _handleClose);
-  void _process.on('error', _handleError);
+  void childProcess.on('message', handleMessage);
+  void childProcess.on('close', handleClose);
+  void childProcess.on('error', handleError);
 
   // Set up pipes as needed.
-  if (_process.stdin) {
-    process.stdin.pipe(_process.stdin);
+  if (childProcess.stdin) {
+    process.stdin.pipe(childProcess.stdin);
   }
 
-  if (_process.stdout) {
-    _process.stdout.pipe(process.stdout);
+  if (childProcess.stdout) {
+    childProcess.stdout.pipe(process.stdout);
   }
 
-  if (_process.stderr) {
-    _process.stderr.pipe(process.stderr);
-    _process.stderr.on('data', _handleStderrData);
-  } else if (bin.endsWith('node')) {
+  if (childProcess.stderr) {
+    childProcess.stderr.pipe(process.stderr);
+    childProcess.stderr.on('data', handleStderrData);
+  } else if (opts.bin.endsWith('node')) {
     log.verbose('With current stdio configuration, Sentinelle will be unable to detect hanging/paused Node debugger instances.');
   }
 
-  _setState('STARTED');
+  setState('STARTED');
 
   return processDescriptor as Required<ProcessDescriptor>;
 }

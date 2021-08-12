@@ -42,7 +42,7 @@ const initAdeiu = (sentinelle: ReturnType<typeof SentinelleFactory>) => adeiu(as
 
 cli.command<SentinelleArguments>({
   command: '* <entrypoint>',
-  builder: ({command}) => {
+  builder: ({ command }) => {
     command.usage('Run a process, watch for file changes, and re-start the process.');
 
     command.positional('entrypoint', {
@@ -83,9 +83,15 @@ cli.command<SentinelleArguments>({
 
     return command;
   },
-  handler: async ({argv}) => {
+  handler: async ({ argv }) => {
     try {
-      const {entrypoint: entry, bin, watch, kill: processShutdownSignal, quiet} = argv;
+      const {
+        entrypoint: entry,
+        bin,
+        watch,
+        kill: processShutdownSignal,
+        quiet
+      } = argv;
 
       if (quiet) {
         log.configure({level: 'warn'});
