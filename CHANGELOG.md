@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.11](https://github.com/darkobits/sentinelle/compare/v0.6.10...v0.6.11) (2021-08-12)
+
+
+### 🏗 Chores
+
+* **deps:** Update dependencies. ([972ca08](https://github.com/darkobits/sentinelle/commit/972ca08bb7ff6c4b3c92c469814270ce9989ff62))
+
 ### [0.6.10](https://github.com/darkobits/sentinelle/compare/v0.6.9...v0.6.10) (2021-08-12)
 
 
