@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.10](https://github.com/darkobits/sentinelle/compare/v0.6.9...v0.6.10) (2021-08-12)
+
+
+### 🏗 Chores
+
+* **deps:** Update dependencies. ([029bd97](https://github.com/darkobits/sentinelle/commit/029bd97212658202622b0ec693a2a6124fa0cb44))
+* Update ci.yml. ([c1cb738](https://github.com/darkobits/sentinelle/commit/c1cb738536244060ad5b7cd35e3d51cabdb462e8))
+
+
+### 🛠 Refactoring
+
+* Misc. refactoring. ([d6dcddd](https://github.com/darkobits/sentinelle/commit/d6dcddd9aa371a58037013d907991ced743da414))
+
 ### [0.6.9](https://github.com/darkobits/sentinelle/compare/v0.6.8...v0.6.9) (2021-06-05)
 
 
