@@ -19,7 +19,7 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "prepare": "nps prepare"
+    "prepare": "nr prepare"
   },
   "dependencies": {
     "@darkobits/adeiu": "^0.2.12",
@@ -34,7 +34,7 @@
     "read-pkg-up": "^7.0.0"
   },
   "devDependencies": {
-    "@darkobits/ts": "^0.3.3",
+    "@darkobits/ts": "^0.7.11",
     "@types/ms": "^0.7.30",
     "@types/uuid": "^8.0.0",
     "bytes": "^3.1.0",

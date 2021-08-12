@@ -31,7 +31,7 @@ describe('Sentinelle', () => {
   beforeEach(async () => {
     chokidarWatchEmitter = new Emittery();
 
-    // @ts-ignore
+    // @ts-expect-error
     chokidarWatchEmitter.close = jest.fn(() => {
       // console.warn('[watcher.close] Called with:', args);
     });
@@ -203,6 +203,6 @@ describe('Sentinelle', () => {
     statSyncSpy.mockRestore();
     setTimeoutSpy.mockRestore();
 
-    jest.resetModuleRegistry();
+    jest.resetModules();
   });
 });

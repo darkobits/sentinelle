@@ -1,4 +1,4 @@
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 
 import log from 'lib/log';
 
@@ -33,11 +33,11 @@ function createMockProcessHandle(eventEmitter: EventEmitter) {
   const eventSpies: any = {};
 
   const stdout = new EventEmitter();
-  // @ts-ignore
+  // @ts-expect-error
   stdout.pipe = jest.fn();
 
   const stderr = new EventEmitter();
-  // @ts-ignore
+  // @ts-expect-error
   stderr.pipe = jest.fn();
 
   return {
@@ -138,18 +138,18 @@ describe('Process Descriptor', () => {
 
     it('should issue hints on appropriate errors', async () => {
       const noShebangErr = new Error('no shebang');
-      // @ts-ignore
+      // @ts-expect-error
       noShebangErr.exitCode = 2;
-      // @ts-ignore
+      // @ts-expect-error
       noShebangErr.failed = true;
-      // @ts-ignore
+      // @ts-expect-error
       noShebangErr.command = 'bad-file.js';
 
       processHandle.emit('error', noShebangErr);
       expect(errorSpy.mock.calls[0][1]).toMatch('shebang');
 
       const noExecPermissionErr = new Error('no exec flag');
-      // @ts-ignore
+      // @ts-expect-error
       noExecPermissionErr.code = 'EACCES';
 
       processHandle.emit('error', noExecPermissionErr);

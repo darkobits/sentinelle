@@ -66,7 +66,7 @@ describe('ensureBin', () => {
   describe('on Windows platforms', () => {
     beforeEach(() => {
       osPlatformSpy.mockReturnValue('win32');
-      // @ts-ignore
+      // @ts-expect-error
       execSyncSpy.mockReturnValue('');
     });
 
@@ -82,7 +82,7 @@ describe('ensureBin', () => {
   describe('on non-Windows platforms', () => {
     beforeEach(() => {
       osPlatformSpy.mockReturnValue('darwin');
-      // @ts-ignore
+      // @ts-expect-error
       execSyncSpy.mockReturnValue('');
     });
 
@@ -98,7 +98,6 @@ describe('ensureBin', () => {
   describe('when the binary is not found on the system', () => {
     beforeEach(() => {
       osPlatformSpy.mockReturnValue('darwin');
-      // @ts-ignore
       execSyncSpy.mockImplementation(() => {
         throw new Error('Command failed');
       });
@@ -120,7 +119,6 @@ describe('ensureBin', () => {
 
     beforeEach(() => {
       osPlatformSpy.mockReturnValue('darwin');
-      // @ts-ignore
       execSyncSpy.mockImplementation(() => {
         throw new Error(MESSAGE);
       });
@@ -169,7 +167,7 @@ describe('ensureFile', () => {
     beforeEach(() => {
       accessSyncSpy.mockImplementation(() => {
         const err = new Error();
-        // @ts-ignore
+        // @ts-expect-error
         err.code = 'ENOENT';
         throw err;
       });
@@ -186,7 +184,7 @@ describe('ensureFile', () => {
     beforeEach(() => {
       accessSyncSpy.mockImplementation(() => {
         const err = new Error();
-        // @ts-ignore
+        // @ts-expect-error
         err.code = 'EACCES';
         throw err;
       });
@@ -228,7 +226,7 @@ describe('getPackageVersion', () => {
   let getPackageVersion: typeof utils.getPackageVersion;
 
   beforeEach(() => {
-    jest.resetModuleRegistry();
+    jest.resetModules();
 
     jest.doMock('read-pkg-up', () => {
       return async () => {
